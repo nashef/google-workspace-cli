@@ -451,5 +451,338 @@ def clear(confirm):
         sys.exit(1)
 
 
+@main.group()
+def groups():
+    """Manage contact groups.
+
+    Examples:
+        gwc-people groups list
+        gwc-people groups create --name "Team"
+        gwc-people groups add-member "contactGroups/123" "john@example.com"
+    """
+    pass
+
+
+@groups.command()
+@click.option(
+    '--output',
+    type=click.Choice(['unix', 'json', 'llm']),
+    default='unix',
+    help='Output format (default: unix)'
+)
+def list(output):
+    """List all contact groups."""
+    try:
+        groups_list = operations.list_contact_groups()
+
+        if not groups_list:
+            click.echo("No contact groups found.")
+            return
+
+        # Extract group info
+        formatted_groups = []
+        for group in groups_list:
+            member_count = len(group.get('memberResourceNames', []))
+            formatted_groups.append({
+                'name': group.get('name'),
+                'resourceName': group.get('resourceName'),
+                'memberCount': member_count,
+                'groupType': group.get('groupType', 'CONTACT_GROUP')
+            })
+
+        format_type = OutputFormat(output)
+        fields = ['name', 'resourceName', 'memberCount', 'groupType']
+        headers = ['Name', 'Resource Name', 'Members', 'Type']
+        output_str = format_output(formatted_groups, format_type, fields, headers)
+        click.echo(output_str)
+
+    except GwcError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@groups.command()
+@click.argument('group_id')
+@click.option(
+    '--output',
+    type=click.Choice(['unix', 'json', 'llm']),
+    default='unix',
+    help='Output format (default: unix)'
+)
+def get(group_id, output):
+    """Get contact group details with members."""
+    try:
+        group = operations.get_contact_group(group_id)
+
+        format_type = OutputFormat(output)
+        fields = ['name', 'resourceName', 'memberResourceNames', 'groupType', 'etag']
+        output_str = format_output(group, format_type, fields)
+        click.echo(output_str)
+
+    except ValidationError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+    except GwcError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@groups.command()
+@click.option(
+    '--name',
+    required=True,
+    help='Name of the new group'
+)
+@click.option(
+    '--output',
+    type=click.Choice(['unix', 'json', 'llm']),
+    default='unix',
+    help='Output format (default: unix)'
+)
+def create(name, output):
+    """Create a new contact group."""
+    try:
+        group = operations.create_contact_group(name)
+
+        format_type = OutputFormat(output)
+        fields = ['name', 'resourceName', 'etag']
+        output_str = format_output(group, format_type, fields)
+        click.echo(output_str)
+
+    except ValidationError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+    except GwcError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@groups.command()
+@click.argument('group_id')
+@click.option(
+    '--name',
+    required=True,
+    help='New name for the group'
+)
+@click.option(
+    '--output',
+    type=click.Choice(['unix', 'json', 'llm']),
+    default='unix',
+    help='Output format (default: unix)'
+)
+def update(group_id, name, output):
+    """Update contact group name."""
+    try:
+        group = operations.update_contact_group(group_id, name)
+
+        format_type = OutputFormat(output)
+        fields = ['name', 'resourceName', 'etag']
+        output_str = format_output(group, format_type, fields)
+        click.echo(output_str)
+
+    except ValidationError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+    except GwcError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@groups.command()
+@click.argument('group_id')
+@click.option(
+    '--confirm',
+    is_flag=True,
+    help='Confirm deletion without prompting'
+)
+def delete(group_id, confirm):
+    """Delete a contact group."""
+    try:
+        if not confirm:
+            if not click.confirm(f"Delete group {group_id}? This cannot be undone."):
+                click.echo("Deletion cancelled.")
+                return
+
+        operations.delete_contact_group(group_id)
+        click.echo("Group deleted successfully.")
+
+    except ValidationError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+    except GwcError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@groups.command()
+@click.argument('group_id')
+@click.argument('email_or_id')
+def add_member(group_id, email_or_id):
+    """Add a member to a contact group."""
+    try:
+        # If email provided, look up the contact
+        if "@" in email_or_id and not email_or_id.startswith("people/"):
+            contact = operations.get_contact(email_or_id, fields="names")
+            resource_name = contact.get('resourceName')
+        else:
+            resource_name = email_or_id
+
+        operations.add_group_member(group_id, resource_name)
+        click.echo(f"Member added to group successfully.")
+
+    except ValidationError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+    except GwcError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@groups.command()
+@click.argument('group_id')
+@click.argument('email_or_id')
+def remove_member(group_id, email_or_id):
+    """Remove a member from a contact group."""
+    try:
+        # If email provided, look up the contact
+        if "@" in email_or_id and not email_or_id.startswith("people/"):
+            contact = operations.get_contact(email_or_id, fields="names")
+            resource_name = contact.get('resourceName')
+        else:
+            resource_name = email_or_id
+
+        operations.remove_group_member(group_id, resource_name)
+        click.echo(f"Member removed from group successfully.")
+
+    except ValidationError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+    except GwcError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@main.group()
+def directory():
+    """Search Google Workspace directory (Workspace users only).
+
+    Examples:
+        gwc-people directory search "john"
+        gwc-people directory list --limit 50
+    """
+    pass
+
+
+@directory.command()
+@click.argument('query')
+@click.option(
+    '--limit',
+    type=int,
+    default=100,
+    help='Maximum results to return (default: 100, max: 500)'
+)
+@click.option(
+    '--output',
+    type=click.Choice(['unix', 'json', 'llm']),
+    default='unix',
+    help='Output format (default: unix)'
+)
+def search(query, limit, output):
+    """Search the Google Workspace directory."""
+    try:
+        if limit < 1 or limit > 500:
+            click.echo("Error: Limit must be between 1 and 500", err=True)
+            sys.exit(1)
+
+        results = operations.search_directory(query, page_size=limit)
+
+        if not results:
+            click.echo("No directory entries found.")
+            return
+
+        # Extract profile info
+        profiles = []
+        for person in results:
+            names = person.get('names', [])
+            emails = person.get('emailAddresses', [])
+            profiles.append({
+                'displayName': names[0].get('displayName', 'N/A') if names else 'N/A',
+                'email': emails[0].get('value', 'N/A') if emails else 'N/A',
+                'jobTitle': person.get('jobTitle', 'N/A'),
+                'department': person.get('departments', [{}])[0].get('value', 'N/A') if person.get('departments') else 'N/A'
+            })
+
+        format_type = OutputFormat(output)
+        fields = ['displayName', 'email', 'jobTitle', 'department']
+        headers = ['Name', 'Email', 'Job Title', 'Department']
+        output_str = format_output(profiles, format_type, fields, headers)
+        click.echo(output_str)
+
+    except ValidationError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+    except GwcError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@directory.command()
+@click.option(
+    '--limit',
+    type=int,
+    default=100,
+    help='Maximum results per page (default: 100, max: 500)'
+)
+@click.option(
+    '--output',
+    type=click.Choice(['unix', 'json', 'llm']),
+    default='unix',
+    help='Output format (default: unix)'
+)
+def list(limit, output):
+    """List all profiles in the Google Workspace directory."""
+    try:
+        if limit < 1 or limit > 500:
+            click.echo("Error: Limit must be between 1 and 500", err=True)
+            sys.exit(1)
+
+        result = operations.list_directory(page_size=limit)
+        profiles_data = result.get('people', [])
+
+        if not profiles_data:
+            click.echo("No directory profiles found.")
+            return
+
+        # Extract profile info
+        profiles = []
+        for person in profiles_data:
+            names = person.get('names', [])
+            emails = person.get('emailAddresses', [])
+            profiles.append({
+                'displayName': names[0].get('displayName', 'N/A') if names else 'N/A',
+                'email': emails[0].get('value', 'N/A') if emails else 'N/A',
+                'jobTitle': person.get('jobTitle', 'N/A'),
+                'department': person.get('departments', [{}])[0].get('value', 'N/A') if person.get('departments') else 'N/A'
+            })
+
+        format_type = OutputFormat(output)
+        fields = ['displayName', 'email', 'jobTitle', 'department']
+        headers = ['Name', 'Email', 'Job Title', 'Department']
+        output_str = format_output(profiles, format_type, fields, headers)
+        click.echo(output_str)
+
+        # Show pagination info
+        next_token = result.get('nextPageToken')
+        if next_token:
+            click.echo(f"\nMore results available. Use --limit with a larger value for more results.")
+
+    except ValidationError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+    except GwcError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
 if __name__ == "__main__":
     main()

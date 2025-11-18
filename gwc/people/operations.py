@@ -598,3 +598,363 @@ def sync_contacts(cache: Optional[ContactCache] = None, force_full: bool = False
             if not force_full:
                 return sync_contacts(cache=cache, force_full=True)
         raise APIError(f"Failed to sync contacts: {e}")
+
+
+# ============================================================================
+# Contact Groups Operations
+# ============================================================================
+
+def list_contact_groups() -> List[Dict[str, Any]]:
+    """List all contact groups (user-created and system groups).
+
+    Returns:
+        List of contact group objects
+
+    Raises:
+        APIError: If API call fails
+    """
+    service = build_people_service()
+
+    try:
+        result = service.contactGroups().list().execute()
+        return result.get('contactGroups', [])
+    except HttpError as e:
+        raise APIError(f"Failed to list contact groups: {e}")
+
+
+def get_contact_group(group_id: str) -> Dict[str, Any]:
+    """Get details of a specific contact group.
+
+    Args:
+        group_id: Group resource ID (e.g., contactGroups/123456)
+
+    Returns:
+        Contact group object with member list
+
+    Raises:
+        ValidationError: If group_id is invalid
+        APIError: If API call fails or group not found
+    """
+    if not group_id or not group_id.strip():
+        raise ValidationError("Group ID cannot be empty")
+
+    service = build_people_service()
+
+    try:
+        result = service.contactGroups().get(
+            resourceName=group_id,
+            maxMembers=10000
+        ).execute()
+        return result
+    except HttpError as e:
+        if e.resp.status == 404:
+            raise ValidationError(f"Contact group not found: {group_id}")
+        raise APIError(f"Failed to get contact group: {e}")
+
+
+def create_contact_group(name: str) -> Dict[str, Any]:
+    """Create a new contact group.
+
+    Args:
+        name: Group name (must be unique)
+
+    Returns:
+        Created contact group object with resource name
+
+    Raises:
+        ValidationError: If name is invalid or already exists
+        APIError: If API call fails
+    """
+    if not name or not name.strip():
+        raise ValidationError("Group name cannot be empty")
+
+    service = build_people_service()
+
+    try:
+        result = service.contactGroups().create(
+            body={'contactGroup': {'name': name.strip()}}
+        ).execute()
+        return result
+    except HttpError as e:
+        if e.resp.status == 409:
+            raise ValidationError(f"Contact group '{name}' already exists")
+        raise APIError(f"Failed to create contact group: {e}")
+
+
+def update_contact_group(group_id: str, name: str) -> Dict[str, Any]:
+    """Update a contact group's name.
+
+    Args:
+        group_id: Group resource ID
+        name: New group name
+
+    Returns:
+        Updated contact group object
+
+    Raises:
+        ValidationError: If parameters invalid
+        APIError: If API call fails
+    """
+    if not group_id or not group_id.strip():
+        raise ValidationError("Group ID cannot be empty")
+
+    if not name or not name.strip():
+        raise ValidationError("Group name cannot be empty")
+
+    service = build_people_service()
+
+    try:
+        # Get current group to get etag
+        current = service.contactGroups().get(resourceName=group_id).execute()
+        etag = current.get('etag')
+
+        result = service.contactGroups().update(
+            resourceName=group_id,
+            body={
+                'contactGroup': {
+                    'name': name.strip(),
+                    'etag': etag
+                }
+            }
+        ).execute()
+        return result
+    except HttpError as e:
+        if e.resp.status == 404:
+            raise ValidationError(f"Contact group not found: {group_id}")
+        if e.resp.status == 409:
+            raise ValidationError(f"Contact group '{name}' already exists")
+        raise APIError(f"Failed to update contact group: {e}")
+
+
+def delete_contact_group(group_id: str) -> None:
+    """Delete a contact group.
+
+    Note: System groups cannot be deleted.
+
+    Args:
+        group_id: Group resource ID
+
+    Raises:
+        ValidationError: If group not found or is a system group
+        APIError: If API call fails
+    """
+    if not group_id or not group_id.strip():
+        raise ValidationError("Group ID cannot be empty")
+
+    service = build_people_service()
+
+    try:
+        service.contactGroups().delete(resourceName=group_id).execute()
+    except HttpError as e:
+        if e.resp.status == 404:
+            raise ValidationError(f"Contact group not found: {group_id}")
+        if e.resp.status == 400:
+            raise ValidationError(f"Cannot delete system group")
+        raise APIError(f"Failed to delete contact group: {e}")
+
+
+def add_group_member(group_id: str, resource_name: str) -> None:
+    """Add a single member to a contact group.
+
+    Args:
+        group_id: Group resource ID
+        resource_name: Contact resource name (people/c...)
+
+    Raises:
+        ValidationError: If parameters invalid
+        APIError: If API call fails
+    """
+    if not group_id or not group_id.strip():
+        raise ValidationError("Group ID cannot be empty")
+
+    if not resource_name or not resource_name.strip():
+        raise ValidationError("Contact resource name cannot be empty")
+
+    service = build_people_service()
+
+    try:
+        service.contactGroups().members().modify(
+            resourceName=group_id,
+            body={'resourceNamesToAdd': [resource_name.strip()]}
+        ).execute()
+    except HttpError as e:
+        if e.resp.status == 404:
+            raise ValidationError(f"Group or contact not found")
+        raise APIError(f"Failed to add group member: {e}")
+
+
+def add_group_members(group_id: str, resource_names: List[str]) -> None:
+    """Add multiple members to a contact group.
+
+    Args:
+        group_id: Group resource ID
+        resource_names: List of contact resource names
+
+    Raises:
+        ValidationError: If parameters invalid
+        APIError: If API call fails
+    """
+    if not group_id or not group_id.strip():
+        raise ValidationError("Group ID cannot be empty")
+
+    if not resource_names:
+        raise ValidationError("Resource names list cannot be empty")
+
+    service = build_people_service()
+
+    try:
+        service.contactGroups().members().modify(
+            resourceName=group_id,
+            body={'resourceNamesToAdd': resource_names}
+        ).execute()
+    except HttpError as e:
+        if e.resp.status == 404:
+            raise ValidationError(f"Group or contact not found")
+        raise APIError(f"Failed to add group members: {e}")
+
+
+def remove_group_member(group_id: str, resource_name: str) -> None:
+    """Remove a member from a contact group.
+
+    Args:
+        group_id: Group resource ID
+        resource_name: Contact resource name (people/c...)
+
+    Raises:
+        ValidationError: If parameters invalid
+        APIError: If API call fails
+    """
+    if not group_id or not group_id.strip():
+        raise ValidationError("Group ID cannot be empty")
+
+    if not resource_name or not resource_name.strip():
+        raise ValidationError("Contact resource name cannot be empty")
+
+    service = build_people_service()
+
+    try:
+        service.contactGroups().members().modify(
+            resourceName=group_id,
+            body={'resourceNamesToRemove': [resource_name.strip()]}
+        ).execute()
+    except HttpError as e:
+        if e.resp.status == 404:
+            raise ValidationError(f"Group or contact not found")
+        raise APIError(f"Failed to remove group member: {e}")
+
+
+def batch_add_to_group(group_id: str, emails_or_ids: List[str]) -> Dict[str, Any]:
+    """Add multiple contacts to a group by email or resource name.
+
+    This is a convenience function that looks up contacts by email if needed.
+
+    Args:
+        group_id: Group resource ID
+        emails_or_ids: List of emails or resource names
+
+    Returns:
+        Result dict with added_count
+
+    Raises:
+        APIError: If API call fails
+    """
+    if not emails_or_ids:
+        raise ValidationError("Emails/IDs list cannot be empty")
+
+    # Convert emails to resource names if needed
+    resource_names = []
+    for email_or_id in emails_or_ids:
+        if "@" in email_or_id and not email_or_id.startswith("people/"):
+            # It's an email, look up the contact
+            try:
+                contact = get_contact(email_or_id, fields="names")
+                resource_names.append(contact.get('resourceName'))
+            except APIError:
+                continue  # Skip if not found
+        else:
+            resource_names.append(email_or_id.strip())
+
+    if resource_names:
+        add_group_members(group_id, resource_names)
+        return {'added_count': len(resource_names)}
+
+    return {'added_count': 0}
+
+
+# ============================================================================
+# Directory Operations (Google Workspace only)
+# ============================================================================
+
+def search_directory(query: str, page_size: int = 100) -> List[Dict[str, Any]]:
+    """Search the Google Workspace directory.
+
+    Note: Requires Google Workspace and directory search enabled.
+
+    Args:
+        query: Search query (name, email, etc.)
+        page_size: Number of results to return (default: 100, max: 500)
+
+    Returns:
+        List of matching directory profiles
+
+    Raises:
+        ValidationError: If query invalid
+        APIError: If API call fails or feature not available
+    """
+    if not query or not query.strip():
+        raise ValidationError("Search query cannot be empty")
+
+    if page_size < 1 or page_size > 500:
+        raise ValidationError("Page size must be between 1 and 500")
+
+    service = build_people_service()
+
+    try:
+        result = service.people().searchDirectoryPeople(
+            query=query.strip(),
+            pageSize=page_size,
+            readMask="names,emailAddresses,phoneNumbers,jobTitle,departments,photographs"
+        ).execute()
+        return result.get('people', [])
+    except HttpError as e:
+        if e.resp.status == 403:
+            raise APIError(
+                "Directory search not available. "
+                "Requires Google Workspace and directory search enabled."
+            )
+        raise APIError(f"Failed to search directory: {e}")
+
+
+def list_directory(page_size: int = 100) -> Dict[str, Any]:
+    """List all profiles in the Google Workspace directory.
+
+    Note: Requires Google Workspace and directory listing enabled.
+
+    Args:
+        page_size: Number of results per page (default: 100, max: 500)
+
+    Returns:
+        Dict with 'people' list and pagination token if available
+
+    Raises:
+        ValidationError: If parameters invalid
+        APIError: If API call fails or feature not available
+    """
+    if page_size < 1 or page_size > 500:
+        raise ValidationError("Page size must be between 1 and 500")
+
+    service = build_people_service()
+
+    try:
+        result = service.people().listDirectoryPeople(
+            pageSize=page_size,
+            readMask="names,emailAddresses,phoneNumbers,jobTitle,departments,photographs"
+        ).execute()
+        return result
+    except HttpError as e:
+        if e.resp.status == 403:
+            raise APIError(
+                "Directory listing not available. "
+                "Requires Google Workspace and directory listing enabled."
+            )
+        raise APIError(f"Failed to list directory: {e}")
