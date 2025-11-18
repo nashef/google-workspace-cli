@@ -8,10 +8,18 @@ This is the exhaustive reference for all `gwc-people` commands and options. For 
 gwc-people [OPTIONS] COMMAND [ARGS]...
 
 Commands:
-  auth   - Authenticate with Google Workspace
-  search - Search for contacts by name, email, phone, or organization
-  get    - Get contact details by email address or resource name
-  list   - List your contacts
+  auth      - Authenticate with Google Workspace
+  search    - Search for contacts by name, email, phone, or organization
+  get       - Get contact details by email address or resource name
+  list      - List your contacts
+  create    - Create a new contact
+  update    - Update an existing contact
+  delete    - Delete a contact
+  cache     - Manage local contact cache
+  groups    - Manage contact groups
+  directory - Search Google Workspace directory (requires Workspace account)
+  export    - Export contacts to CSV or JSON
+  import    - Import contacts from CSV or JSON
 ```
 
 ---
@@ -214,6 +222,530 @@ poetry run gwc-people list --limit 1000 --output json > all_contacts.json
 Human-readable view:
 ```bash
 poetry run gwc-people list --limit 20 --output llm
+```
+
+---
+
+## `gwc-people create`
+
+Create a new contact.
+
+**Usage:**
+```bash
+gwc-people create [OPTIONS]
+```
+
+**Options:**
+- `--name TEXT` - Contact's display name
+- `--email TEXT` - Contact's email address
+- `--phone TEXT` - Contact's phone number
+- `--organization TEXT` - Contact's organization/company name
+- `--output [unix|json|llm]` - Output format (default: unix)
+
+**Requirements:**
+- At least one of `--name` or `--email` is required
+
+**Examples:**
+
+Create contact with name and email:
+```bash
+poetry run gwc-people create --name "John Smith" --email "john@example.com"
+```
+
+Create contact with all details:
+```bash
+poetry run gwc-people create \
+  --name "Jane Doe" \
+  --email "jane@example.com" \
+  --phone "+1-555-0001" \
+  --organization "Acme Corp"
+```
+
+Create and view as JSON:
+```bash
+poetry run gwc-people create --name "Bob Wilson" --email "bob@example.com" --output json
+```
+
+---
+
+## `gwc-people update`
+
+Update an existing contact's information.
+
+**Usage:**
+```bash
+gwc-people update EMAIL_OR_ID [OPTIONS]
+```
+
+**Required Arguments:**
+- `EMAIL_OR_ID` - Contact email address or resource name
+
+**Options:**
+- `--name TEXT` - Update display name
+- `--email TEXT` - Update email address
+- `--phone TEXT` - Update phone number
+- `--organization TEXT` - Update organization
+- `--output [unix|json|llm]` - Output format (default: unix)
+
+**Examples:**
+
+Update contact's email:
+```bash
+poetry run gwc-people update "john@example.com" --email "newemail@example.com"
+```
+
+Update by resource name:
+```bash
+poetry run gwc-people update "people/c123456789" --phone "+1-555-0002"
+```
+
+Update multiple fields:
+```bash
+poetry run gwc-people update "jane@example.com" \
+  --name "Jane Smith" \
+  --phone "+1-555-0003" \
+  --organization "Tech Inc"
+```
+
+---
+
+## `gwc-people delete`
+
+Delete a contact permanently.
+
+**Usage:**
+```bash
+gwc-people delete EMAIL_OR_ID [OPTIONS]
+```
+
+**Required Arguments:**
+- `EMAIL_OR_ID` - Contact email address or resource name
+
+**Examples:**
+
+Delete by email:
+```bash
+poetry run gwc-people delete "john@example.com"
+```
+
+Delete by resource name:
+```bash
+poetry run gwc-people delete "people/c123456789"
+```
+
+---
+
+## `gwc-people export`
+
+Export contacts to a file (CSV or JSON format).
+
+**Usage:**
+```bash
+gwc-people export FILE_PATH [OPTIONS]
+```
+
+**Required Arguments:**
+- `FILE_PATH` - Path where to save the exported file
+
+**Options:**
+- `--format [csv|json]` - Export format (default: csv, auto-detected from file extension)
+
+**CSV Format:**
+Simple tabular format with columns: `name,email,phone,organization`
+
+**JSON Format:**
+Full contact objects with all available fields and metadata.
+
+**Examples:**
+
+Export all contacts to CSV:
+```bash
+poetry run gwc-people export ~/contacts.csv
+```
+
+Export to JSON:
+```bash
+poetry run gwc-people export ~/contacts.json --format json
+```
+
+Auto-detect format from filename:
+```bash
+poetry run gwc-people export ~/my_contacts.csv  # Exports as CSV
+poetry run gwc-people export ~/my_contacts.json # Exports as JSON
+```
+
+View exported file:
+```bash
+head ~/contacts.csv
+cat ~/contacts.json | jq '.[0]'
+```
+
+---
+
+## `gwc-people import`
+
+Import contacts from a file (CSV or JSON format).
+
+**Usage:**
+```bash
+poetry run gwc-people import FILE_PATH [OPTIONS]
+```
+
+**Required Arguments:**
+- `FILE_PATH` - Path to the import file
+
+**Options:**
+- `--format [csv|json]` - Import format (default: auto-detect from file extension)
+
+**CSV Format:**
+Expected columns: `name,email,phone,organization`
+- Header row is required
+- Minimum: either name or email required per row
+- Phone and organization are optional
+
+**JSON Format:**
+Accepts either:
+- Array of simple contact objects: `[{name, email, phone, organization}, ...]`
+- Array of full Google People API contact objects (from export)
+
+**Error Handling:**
+- Reports total created/failed counts
+- Lists specific errors with row numbers
+- Continues importing even if some rows fail
+- Requires at least name or email per contact
+
+**Examples:**
+
+Import from CSV:
+```bash
+poetry run gwc-people import ~/contacts.csv
+```
+
+Import from JSON:
+```bash
+poetry run gwc-people import ~/contacts.json
+```
+
+Import with auto-format detection:
+```bash
+poetry run gwc-people import ~/my_contacts.csv  # Auto-detected as CSV
+poetry run gwc-people import ~/my_contacts.json # Auto-detected as JSON
+```
+
+View import results:
+```bash
+# Command output shows:
+# Import completed:
+#   Created: 10
+#   Failed: 1
+#
+# Errors:
+#   Row 3: Failed to create contact: <error message>
+```
+
+---
+
+## `gwc-people cache`
+
+Manage the local contact cache.
+
+**Usage:**
+```bash
+gwc-people cache SUBCOMMAND [OPTIONS]
+```
+
+**Subcommands:**
+
+### `cache list`
+
+List cached contacts.
+
+**Usage:**
+```bash
+gwc-people cache list [OPTIONS]
+```
+
+**Options:**
+- `--limit INTEGER` - Maximum contacts to display (default: 100)
+- `--sort [displayName|email|lastModified]` - Sort order (default: displayName)
+- `--output [unix|json|llm]` - Output format (default: unix)
+
+**Examples:**
+
+List cached contacts:
+```bash
+poetry run gwc-people cache list
+```
+
+List most recently modified:
+```bash
+poetry run gwc-people cache list --sort lastModified --limit 20
+```
+
+### `cache sync`
+
+Synchronize cache with Google Contacts (incremental or full).
+
+**Usage:**
+```bash
+gwc-people cache sync [OPTIONS]
+```
+
+**Options:**
+- `--full` - Force full sync (ignores cached sync token)
+- `--force` - Sync even if cache is recent
+
+**Behavior:**
+- On first sync: Performs full sync and stores sync token
+- On subsequent syncs: Uses sync token for incremental updates
+- Caches changes since last sync for better performance
+
+**Examples:**
+
+Perform incremental sync (uses cached token):
+```bash
+poetry run gwc-people cache sync
+```
+
+Force full resync:
+```bash
+poetry run gwc-people cache sync --full
+```
+
+Sync regardless of age:
+```bash
+poetry run gwc-people cache sync --force
+```
+
+### `cache clear`
+
+Clear all cached contacts and reset sync token.
+
+**Usage:**
+```bash
+poetry run gwc-people cache clear
+```
+
+**Behavior:**
+- Deletes all cached contacts from local database
+- Resets sync token
+- Next sync will be a full sync
+
+**Examples:**
+
+Clear the cache:
+```bash
+poetry run gwc-people cache clear
+```
+
+---
+
+## `gwc-people groups`
+
+Manage contact groups.
+
+**Usage:**
+```bash
+gwc-people groups SUBCOMMAND [OPTIONS]
+```
+
+**Subcommands:**
+
+### `groups list`
+
+List all contact groups.
+
+**Usage:**
+```bash
+gwc-people groups list [OPTIONS]
+```
+
+**Options:**
+- `--output [unix|json|llm]` - Output format (default: unix)
+
+**Examples:**
+
+List all groups:
+```bash
+poetry run gwc-people groups list
+```
+
+List as JSON:
+```bash
+poetry run gwc-people groups list --output json | jq '.[] | .name'
+```
+
+### `groups get`
+
+Get details of a specific group.
+
+**Usage:**
+```bash
+gwc-people groups get GROUP_NAME [OPTIONS]
+```
+
+**Options:**
+- `--output [unix|json|llm]` - Output format (default: unix)
+
+**Examples:**
+
+Get group details:
+```bash
+poetry run gwc-people groups get "Work"
+```
+
+### `groups create`
+
+Create a new contact group.
+
+**Usage:**
+```bash
+gwc-people groups create GROUP_NAME
+```
+
+**Requirements:**
+- Group names must be unique
+
+**Examples:**
+
+Create new group:
+```bash
+poetry run gwc-people groups create "Project Team"
+```
+
+### `groups update`
+
+Rename a contact group.
+
+**Usage:**
+```bash
+gwc-people groups update GROUP_NAME --name NEW_NAME
+```
+
+**Examples:**
+
+Rename group:
+```bash
+poetry run gwc-people groups update "Team A" --name "Team Alpha"
+```
+
+### `groups delete`
+
+Delete a contact group.
+
+**Usage:**
+```bash
+gwc-people groups delete GROUP_NAME
+```
+
+**Examples:**
+
+Delete group:
+```bash
+poetry run gwc-people groups delete "Temporary Group"
+```
+
+### `groups add-member`
+
+Add a contact to a group.
+
+**Usage:**
+```bash
+gwc-people groups add-member GROUP_NAME EMAIL_OR_ID
+```
+
+**Arguments:**
+- `GROUP_NAME` - Name of the group
+- `EMAIL_OR_ID` - Contact email or resource name
+
+**Examples:**
+
+Add contact to group by email:
+```bash
+poetry run gwc-people groups add-member "Work" "john@example.com"
+```
+
+Add contact by resource name:
+```bash
+poetry run gwc-people groups add-member "Work" "people/c123456789"
+```
+
+### `groups remove-member`
+
+Remove a contact from a group.
+
+**Usage:**
+```bash
+gwc-people groups remove-member GROUP_NAME EMAIL_OR_ID
+```
+
+**Examples:**
+
+Remove contact from group:
+```bash
+poetry run gwc-people groups remove-member "Work" "john@example.com"
+```
+
+---
+
+## `gwc-people directory`
+
+Search Google Workspace directory (Workspace accounts only).
+
+**Usage:**
+```bash
+gwc-people directory SUBCOMMAND [OPTIONS]
+```
+
+**Requirements:**
+- Google Workspace account
+- Admin must have enabled directory sharing
+
+**Subcommands:**
+
+### `directory search`
+
+Search the Workspace directory.
+
+**Usage:**
+```bash
+gwc-people directory search QUERY [OPTIONS]
+```
+
+**Options:**
+- `--limit INTEGER` - Maximum results (default: 10, max: 30)
+- `--output [unix|json|llm]` - Output format (default: unix)
+
+**Examples:**
+
+Search directory by name:
+```bash
+poetry run gwc-people directory search "John"
+```
+
+Search with limit:
+```bash
+poetry run gwc-people directory search "John" --limit 20
+```
+
+### `directory list`
+
+List people from the Workspace directory.
+
+**Usage:**
+```bash
+gwc-people directory list [OPTIONS]
+```
+
+**Options:**
+- `--limit INTEGER` - Maximum results (default: 100, max: 1000)
+- `--output [unix|json|llm]` - Output format (default: unix)
+
+**Examples:**
+
+List directory people:
+```bash
+poetry run gwc-people directory list --limit 50
 ```
 
 ---

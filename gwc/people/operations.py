@@ -1,6 +1,9 @@
 """Google People API operations."""
 
+import json
+import csv
 from typing import List, Dict, Any, Optional
+from functools import lru_cache
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
@@ -9,8 +12,12 @@ from ..shared.exceptions import APIError, ValidationError
 from .cache import ContactCache
 
 
+@lru_cache(maxsize=1)
 def build_people_service():
-    """Build and return People API service object."""
+    """Build and return People API service object.
+
+    The service object is cached to avoid rebuilding it for each operation.
+    """
     creds = get_credentials(scopes=PEOPLE_SCOPES)
     return build("people", "v1", credentials=creds)
 
@@ -958,3 +965,745 @@ def list_directory(page_size: int = 100) -> Dict[str, Any]:
                 "Requires Google Workspace and directory listing enabled."
             )
         raise APIError(f"Failed to list directory: {e}")
+
+
+# ============================================================================
+# Integration Helpers (for Calendar, Email, etc.)
+# ============================================================================
+
+def get_contact_email_by_name(name: str) -> Optional[str]:
+    """Get email for a contact by name (for Calendar/Email integration).
+
+    Args:
+        name: Contact name or partial name
+
+    Returns:
+        Email address if found, None otherwise
+
+    Raises:
+        APIError: If search fails
+    """
+    try:
+        results = search_contacts(name, page_size=1)
+        if results:
+            person = results[0].get('person', {})
+            emails = person.get('emailAddresses', [])
+            if emails:
+                return emails[0].get('value')
+    except (ValidationError, APIError):
+        pass
+    return None
+
+
+def get_contact_emails_by_group(group_name: str) -> List[str]:
+    """Get all email addresses in a contact group.
+
+    Useful for bulk invitations in Calendar.
+
+    Args:
+        group_name: Name of the group (partial match)
+
+    Returns:
+        List of email addresses in the group
+
+    Raises:
+        APIError: If lookup fails
+    """
+    emails = []
+
+    try:
+        groups = list_contact_groups()
+        target_group = None
+
+        # Find group by name (case-insensitive partial match)
+        for group in groups:
+            if group_name.lower() in group.get('name', '').lower():
+                target_group = group
+                break
+
+        if not target_group:
+            return []
+
+        # Get group details with members
+        group_details = get_contact_group(target_group['resourceName'])
+        member_names = group_details.get('memberResourceNames', [])
+
+        # Get email for each member
+        for resource_name in member_names:
+            try:
+                contact = get_contact(resource_name, fields="emailAddresses")
+                contact_emails = contact.get('emailAddresses', [])
+                if contact_emails:
+                    emails.append(contact_emails[0].get('value'))
+            except (ValidationError, APIError):
+                continue
+
+    except (ValidationError, APIError):
+        pass
+
+    return emails
+
+
+# ============================================================================
+# Import/Export Operations
+# ============================================================================
+
+def export_contacts_csv(file_path: str, cache: Optional[ContactCache] = None) -> Dict[str, Any]:
+    """Export contacts to CSV file.
+
+    Format: name,email,phone,organization
+
+    Args:
+        file_path: Path to write CSV file
+        cache: Optional ContactCache to export from cache instead of API
+
+    Returns:
+        Dict with export_count
+
+    Raises:
+        APIError: If export fails
+    """
+    try:
+        # Get contacts from cache if available, otherwise from API
+        if cache:
+            contacts = cache.list_cached(limit=10000)
+        else:
+            # Fetch all contacts from API
+            result = list_contacts(page_size=1000)
+            contacts = result.get('connections', [])
+
+        with open(file_path, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(['name', 'email', 'phone', 'organization'])
+
+            for contact in contacts:
+                names = contact.get('names', [])
+                name = names[0].get('displayName', '') if names else ''
+
+                emails = contact.get('emailAddresses', [])
+                email = emails[0].get('value', '') if emails else ''
+
+                phones = contact.get('phoneNumbers', [])
+                phone = phones[0].get('value', '') if phones else ''
+
+                orgs = contact.get('organizations', [])
+                org = orgs[0].get('name', '') if orgs else ''
+
+                writer.writerow([name, email, phone, org])
+
+        return {'export_count': len(contacts), 'file_path': file_path}
+
+    except (IOError, OSError) as e:
+        raise APIError(f"Failed to export contacts: {e}")
+
+
+def export_contacts_json(file_path: str, cache: Optional[ContactCache] = None) -> Dict[str, Any]:
+    """Export contacts to JSON file.
+
+    Args:
+        file_path: Path to write JSON file
+        cache: Optional ContactCache to export from cache instead of API
+
+    Returns:
+        Dict with export_count
+
+    Raises:
+        APIError: If export fails
+    """
+    try:
+        # Get contacts from cache if available, otherwise from API
+        if cache:
+            contacts = cache.list_cached(limit=10000)
+        else:
+            # Fetch all contacts from API
+            result = list_contacts(page_size=1000)
+            contacts = result.get('connections', [])
+
+        with open(file_path, 'w') as f:
+            json.dump(contacts, f, indent=2)
+
+        return {'export_count': len(contacts), 'file_path': file_path}
+
+    except (IOError, OSError, TypeError) as e:
+        raise APIError(f"Failed to export contacts: {e}")
+
+
+def import_contacts_csv(file_path: str) -> Dict[str, Any]:
+    """Import contacts from CSV file.
+
+    Expected format: name,email,phone,organization
+
+    Args:
+        file_path: Path to CSV file
+
+    Returns:
+        Dict with created_count, failed_count, and errors
+
+    Raises:
+        APIError: If import fails
+    """
+    created_count = 0
+    failed_count = 0
+    errors = []
+
+    try:
+        with open(file_path, 'r') as f:
+            reader = csv.DictReader(f)
+            for row_num, row in enumerate(reader, start=2):
+                try:
+                    # Handle rows with None values (malformed CSV)
+                    name = (row.get('name') or '').strip()
+                    email = (row.get('email') or '').strip()
+                    phone = (row.get('phone') or '').strip()
+                    org = (row.get('organization') or '').strip()
+
+                    # Require at least name or email
+                    if not name and not email:
+                        errors.append(f"Row {row_num}: Missing name and email")
+                        failed_count += 1
+                        continue
+
+                    # Create contact
+                    create_contact(
+                        name=name if name else None,
+                        email=email if email else None,
+                        phone=phone if phone else None,
+                        organization=org if org else None
+                    )
+                    created_count += 1
+
+                except (ValidationError, APIError) as e:
+                    errors.append(f"Row {row_num}: {str(e)}")
+                    failed_count += 1
+
+        return {
+            'created_count': created_count,
+            'failed_count': failed_count,
+            'errors': errors
+        }
+
+    except (IOError, OSError) as e:
+        raise APIError(f"Failed to import contacts: {e}")
+
+
+def import_contacts_json(file_path: str) -> Dict[str, Any]:
+    """Import contacts from JSON file.
+
+    Expected format: Array of contact objects with name, email, phone, organization
+
+    Args:
+        file_path: Path to JSON file
+
+    Returns:
+        Dict with created_count, failed_count, and errors
+
+    Raises:
+        APIError: If import fails
+    """
+    created_count = 0
+    failed_count = 0
+    errors = []
+
+    try:
+        with open(file_path, 'r') as f:
+            contacts = json.load(f)
+
+        if not isinstance(contacts, list):
+            raise ValidationError("JSON must contain an array of contacts")
+
+        for idx, contact in enumerate(contacts):
+            try:
+                name = contact.get('name', '').strip() if isinstance(contact.get('name'), str) else ''
+                email = contact.get('email', '').strip() if isinstance(contact.get('email'), str) else ''
+                phone = contact.get('phone', '').strip() if isinstance(contact.get('phone'), str) else ''
+                org = contact.get('organization', '').strip() if isinstance(contact.get('organization'), str) else ''
+
+                # Handle nested structures (full contact objects)
+                if isinstance(contact.get('names'), list) and contact['names']:
+                    name = contact['names'][0].get('displayName', name)
+                if isinstance(contact.get('emailAddresses'), list) and contact['emailAddresses']:
+                    email = contact['emailAddresses'][0].get('value', email)
+                if isinstance(contact.get('phoneNumbers'), list) and contact['phoneNumbers']:
+                    phone = contact['phoneNumbers'][0].get('value', phone)
+                if isinstance(contact.get('organizations'), list) and contact['organizations']:
+                    org = contact['organizations'][0].get('name', org)
+
+                # Require at least name or email
+                if not name and not email:
+                    errors.append(f"Contact {idx}: Missing name and email")
+                    failed_count += 1
+                    continue
+
+                # Create contact
+                create_contact(
+                    name=name if name else None,
+                    email=email if email else None,
+                    phone=phone if phone else None,
+                    organization=org if org else None
+                )
+                created_count += 1
+
+            except (ValidationError, APIError) as e:
+                errors.append(f"Contact {idx}: {str(e)}")
+                failed_count += 1
+
+        return {
+            'created_count': created_count,
+            'failed_count': failed_count,
+            'errors': errors
+        }
+
+    except (IOError, OSError) as e:
+        raise APIError(f"Failed to import contacts: {e}")
+    except json.JSONDecodeError as e:
+        raise APIError(f"Invalid JSON file: {e}")
+
+
+# ============================================================================
+# Advanced Search Filters
+# ============================================================================
+
+
+def search_contacts_by_organization(org_name: str, page_size: int = 30) -> List[Dict[str, Any]]:
+    """Search for all contacts from a specific organization.
+
+    Args:
+        org_name: Organization name to search for (prefix-based)
+        page_size: Number of results to return (default: 30, max: 30)
+
+    Returns:
+        List of contacts from the specified organization
+
+    Raises:
+        ValidationError: If org_name is empty or page_size is invalid
+        APIError: If API call fails
+    """
+    if not org_name or not org_name.strip():
+        raise ValidationError("Organization name cannot be empty")
+
+    # Search using organization name
+    results = search_contacts(org_name, page_size=page_size)
+
+    # Filter to only include contacts with matching organization
+    org_name_lower = org_name.lower().strip()
+    filtered = []
+
+    for result in results:
+        person = result.get('person', {})
+        orgs = person.get('organizations', [])
+        for org in orgs:
+            if org_name_lower in org.get('name', '').lower():
+                filtered.append(result)
+                break
+
+    return filtered
+
+
+def search_contacts_by_email_domain(email_domain: str, page_size: int = 30) -> List[Dict[str, Any]]:
+    """Search for all contacts with a specific email domain.
+
+    Args:
+        email_domain: Email domain to search for (e.g., 'example.com')
+        page_size: Number of results to return (default: 30, max: 30)
+
+    Returns:
+        List of contacts with email addresses from the specified domain
+
+    Raises:
+        ValidationError: If email_domain is empty or page_size is invalid
+        APIError: If API call fails
+    """
+    if not email_domain or not email_domain.strip():
+        raise ValidationError("Email domain cannot be empty")
+
+    # Normalize domain
+    domain = email_domain.strip().lower()
+    if domain.startswith('@'):
+        domain = domain[1:]
+
+    # Search using domain
+    search_query = f"@{domain}"
+    results = search_contacts(search_query, page_size=page_size)
+
+    # Filter to only include contacts with matching domain
+    filtered = []
+    for result in results:
+        person = result.get('person', {})
+        emails = person.get('emailAddresses', [])
+        for email in emails:
+            if domain in email.get('value', '').lower():
+                filtered.append(result)
+                break
+
+    return filtered
+
+
+def search_contacts_with_phone(phone_prefix: str = "", page_size: int = 30) -> List[Dict[str, Any]]:
+    """Search for contacts that have phone numbers.
+
+    Optionally filter by phone number prefix.
+
+    Args:
+        phone_prefix: Optional phone number prefix to filter by (e.g., '+1-555')
+        page_size: Number of results to return (default: 30, max: 30)
+
+    Returns:
+        List of contacts with phone numbers
+
+    Raises:
+        APIError: If API call fails
+    """
+    # Get all contacts with phones via list (better than search)
+    service = build_people_service()
+
+    try:
+        results = service.people().connections().list(
+            resourceName='people/me',
+            pageSize=page_size,
+            personFields='names,emailAddresses,phoneNumbers,organizations',
+            sortOrder='FIRST_NAME_ASCENDING'
+        ).execute()
+
+        connections = results.get('connections', [])
+
+        # Filter to only include contacts with phone numbers
+        filtered = []
+        for contact in connections:
+            phones = contact.get('phoneNumbers', [])
+            if phones:
+                if phone_prefix:
+                    # Filter by prefix
+                    prefix_lower = phone_prefix.lower()
+                    for phone in phones:
+                        if prefix_lower in phone.get('value', '').lower():
+                            filtered.append(contact)
+                            break
+                else:
+                    # Just include any contact with a phone
+                    filtered.append(contact)
+
+        return filtered
+    except HttpError as e:
+        raise APIError(f"Failed to search contacts by phone: {e}")
+
+
+def search_contacts_without_email(page_size: int = 30) -> List[Dict[str, Any]]:
+    """Find all contacts that don't have email addresses.
+
+    Useful for data quality checks.
+
+    Args:
+        page_size: Number of results to return (default: 30, max: 30)
+
+    Returns:
+        List of contacts without email addresses
+
+    Raises:
+        APIError: If API call fails
+    """
+    service = build_people_service()
+
+    try:
+        results = service.people().connections().list(
+            resourceName='people/me',
+            pageSize=page_size,
+            personFields='names,emailAddresses,phoneNumbers,organizations'
+        ).execute()
+
+        connections = results.get('connections', [])
+
+        # Filter to contacts without emails
+        filtered = [
+            contact for contact in connections
+            if not contact.get('emailAddresses')
+        ]
+
+        return filtered
+    except HttpError as e:
+        raise APIError(f"Failed to search contacts: {e}")
+
+
+def search_contacts_by_name_pattern(first_name: str = "", last_name: str = "", page_size: int = 30) -> List[Dict[str, Any]]:
+    """Search for contacts by first and/or last name patterns.
+
+    Args:
+        first_name: First name prefix to search for
+        last_name: Last name prefix to search for
+        page_size: Number of results to return (default: 30, max: 30)
+
+    Returns:
+        List of contacts matching the name patterns
+
+    Raises:
+        ValidationError: If both names are empty or page_size is invalid
+        APIError: If API call fails
+    """
+    if not first_name and not last_name:
+        raise ValidationError("At least first_name or last_name must be provided")
+
+    # Build search query
+    search_query = f"{first_name} {last_name}".strip()
+    results = search_contacts(search_query, page_size=page_size)
+
+    # Filter by exact name pattern matching
+    filtered = []
+    first_lower = first_name.lower().strip()
+    last_lower = last_name.lower().strip()
+
+    for result in results:
+        person = result.get('person', {})
+        names = person.get('names', [])
+
+        for name in names:
+            given = name.get('givenName', '').lower()
+            family = name.get('familyName', '').lower()
+
+            # Check if both first and last match (if provided)
+            if first_lower and last_lower:
+                if first_lower in given and last_lower in family:
+                    filtered.append(result)
+                    break
+            elif first_lower:
+                if first_lower in given:
+                    filtered.append(result)
+                    break
+            elif last_lower:
+                if last_lower in family:
+                    filtered.append(result)
+                    break
+
+    return filtered
+
+
+def deduplicate_contacts(contacts: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Remove duplicate contacts from a list.
+
+    Deduplication is based on email address (most unique identifier).
+    If a contact has multiple email addresses, it's included once.
+
+    Args:
+        contacts: List of contact dictionaries (API responses or processed contacts)
+
+    Returns:
+        List of contacts with duplicates removed
+    """
+    seen_emails = set()
+    unique_contacts = []
+
+    for contact in contacts:
+        # Handle both API response format (with 'person' key) and direct contact dicts
+        person = contact.get('person', {}) if isinstance(contact, dict) and 'person' in contact else contact
+
+        if not isinstance(person, dict):
+            # Skip if not a valid contact object
+            continue
+
+        emails = person.get('emailAddresses', [])
+
+        if emails:
+            # Use first email as unique identifier
+            email = emails[0].get('value', '').lower()
+            if email and email not in seen_emails:
+                seen_emails.add(email)
+                unique_contacts.append(contact)
+        else:
+            # If no email, use resource name
+            resource_name = person.get('resourceName', '')
+            if resource_name and resource_name not in seen_emails:
+                seen_emails.add(resource_name)
+                unique_contacts.append(contact)
+
+    return unique_contacts
+
+
+# ============================================================================
+# Performance Optimizations
+# ============================================================================
+
+
+def batch_get_contacts(resource_names: List[str], fields: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Get multiple contacts in a single batch request.
+
+    More efficient than individual get requests when retrieving multiple contacts.
+
+    Args:
+        resource_names: List of contact resource names (e.g., ['people/c123', 'people/c456'])
+        fields: Field mask for response. If None, returns minimal fields
+
+    Returns:
+        List of contact objects
+
+    Raises:
+        ValidationError: If resource_names is empty or invalid
+        APIError: If API call fails
+    """
+    if not resource_names:
+        raise ValidationError("At least one resource name is required")
+
+    if len(resource_names) > 100:
+        raise ValidationError("Batch size limited to 100 contacts per request")
+
+    if not fields:
+        fields = "names,emailAddresses,phoneNumbers,organizations"
+
+    service = build_people_service()
+
+    try:
+        # Use the proper API endpoint for batch get
+        results = service.people().getBatchGet(
+            resourceNames=resource_names,
+            personFields=fields
+        ).execute()
+
+        return results.get('responses', [])
+    except HttpError as e:
+        raise APIError(f"Failed to batch get contacts: {e}")
+
+
+def get_contacts_from_ids(contact_ids: List[str]) -> Dict[str, Dict[str, Any]]:
+    """Get contacts by resource names with automatic batching.
+
+    Splits large lists into batches of 100 to respect API limits.
+
+    Args:
+        contact_ids: List of resource names
+
+    Returns:
+        Dictionary mapping resource name to contact object
+
+    Raises:
+        APIError: If API calls fail
+    """
+    if not contact_ids:
+        return {}
+
+    contacts_by_id = {}
+
+    # Process in batches of 100
+    for i in range(0, len(contact_ids), 100):
+        batch = contact_ids[i:i+100]
+        try:
+            batch_results = batch_get_contacts(batch)
+            for result in batch_results:
+                contact = result.get('person', {})
+                resource_name = contact.get('resourceName', '')
+                if resource_name:
+                    contacts_by_id[resource_name] = contact
+        except APIError as e:
+            # Log error but continue with other batches
+            print(f"Warning: Failed to get batch starting at {i}: {e}")
+            continue
+
+    return contacts_by_id
+
+
+def search_and_cache_contacts(query: str, cache: ContactCache, page_size: int = 10) -> List[Dict[str, Any]]:
+    """Search for contacts and automatically cache results.
+
+    Combines search with caching for better performance on subsequent calls.
+
+    Args:
+        query: Search query
+        cache: ContactCache instance for storing results
+        page_size: Number of results to return
+
+    Returns:
+        List of matching contacts
+
+    Raises:
+        APIError: If search fails
+    """
+    results = search_contacts(query, page_size=page_size)
+
+    # Cache each result
+    for result in results:
+        contact = result.get('person', {})
+        try:
+            cache.cache_contact(contact)
+        except Exception:
+            # Don't fail search if caching fails
+            pass
+
+    return results
+
+
+def bulk_search_by_emails(emails: List[str], cache: Optional[ContactCache] = None) -> Dict[str, Dict[str, Any]]:
+    """Search for multiple contacts by email addresses efficiently.
+
+    Uses caching if available to reduce API calls.
+
+    Args:
+        emails: List of email addresses to search for
+        cache: Optional ContactCache instance for caching results
+
+    Returns:
+        Dictionary mapping email to contact object
+
+    Raises:
+        APIError: If searches fail
+    """
+    contacts_by_email = {}
+
+    for email in emails:
+        try:
+            # Try cache first
+            if cache:
+                # Search cache by email
+                cached = cache.search_cache(email, limit=1)
+                if cached:
+                    contacts_by_email[email] = cached[0]
+                    continue
+
+            # Fall back to API search
+            results = search_contacts(email, page_size=1)
+            if results:
+                contact = results[0].get('person', {})
+                contacts_by_email[email] = contact
+
+                # Cache the result
+                if cache:
+                    try:
+                        cache.cache_contact(contact)
+                    except Exception:
+                        pass
+        except Exception:
+            # Skip emails that can't be found
+            continue
+
+    return contacts_by_email
+
+
+def warmup_cache(cache: ContactCache) -> None:
+    """Warmup the local cache for improved search performance.
+
+    Initial cache warmup significantly improves search performance.
+    Should be called once during setup or when cache is empty.
+
+    Args:
+        cache: ContactCache instance
+
+    Raises:
+        APIError: If warmup fails
+    """
+    try:
+        # Perform a sync to populate cache
+        sync_contacts(cache)
+    except Exception as e:
+        raise APIError(f"Failed to warmup cache: {e}")
+
+
+def estimate_api_quota_usage(operations: List[str]) -> int:
+    """Estimate API quota usage for a list of operations.
+
+    Each operation consumes one unit of quota.
+    Useful for planning large import/export operations.
+
+    Args:
+        operations: List of operation types ('search', 'get', 'create', 'update', 'delete')
+
+    Returns:
+        Estimated quota units needed
+    """
+    # Most operations cost 1 quota unit
+    # Batch operations count as individual operations
+    return len(operations)

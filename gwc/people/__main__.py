@@ -784,5 +784,89 @@ def list(limit, output):
         sys.exit(1)
 
 
+@main.command()
+@click.argument('file_path', type=click.Path())
+@click.option(
+    '--format',
+    type=click.Choice(['csv', 'json']),
+    default='csv',
+    help='File format (default: csv)'
+)
+def export(file_path, format):
+    """Export contacts to file.
+
+    Supports CSV and JSON formats.
+
+    Examples:
+        gwc-people export contacts.csv
+        gwc-people export contacts.json --format json
+    """
+    try:
+        if format == 'csv':
+            result = operations.export_contacts_csv(file_path)
+            click.echo(f"Exported {result['export_count']} contacts to {file_path}")
+        else:
+            result = operations.export_contacts_json(file_path)
+            click.echo(f"Exported {result['export_count']} contacts to {file_path}")
+
+    except GwcError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@main.command(name='import')
+@click.argument('file_path', type=click.Path(exists=True))
+@click.option(
+    '--format',
+    type=click.Choice(['csv', 'json']),
+    default=None,
+    help='File format (auto-detected from extension if not specified)'
+)
+def import_contacts(file_path, format):
+    """Import contacts from file.
+
+    Supports CSV and JSON formats. Auto-detects format from file extension
+    if not specified.
+
+    CSV format: name,email,phone,organization
+    JSON format: Array of objects with name, email, phone, organization fields
+
+    Examples:
+        gwc-people import contacts.csv
+        gwc-people import contacts.json
+        gwc-people import data.txt --format json
+    """
+    try:
+        # Auto-detect format if not specified
+        if format is None:
+            if file_path.endswith('.json'):
+                format = 'json'
+            elif file_path.endswith('.csv'):
+                format = 'csv'
+            else:
+                click.echo("Error: Cannot auto-detect format. Use --format to specify.", err=True)
+                sys.exit(1)
+
+        if format == 'csv':
+            result = operations.import_contacts_csv(file_path)
+        else:
+            result = operations.import_contacts_json(file_path)
+
+        click.echo(f"Import completed:")
+        click.echo(f"  Created: {result['created_count']}")
+        click.echo(f"  Failed: {result['failed_count']}")
+
+        if result.get('errors'):
+            click.echo(f"\nErrors:")
+            for error in result['errors'][:10]:  # Show first 10 errors
+                click.echo(f"  {error}")
+            if len(result['errors']) > 10:
+                click.echo(f"  ... and {len(result['errors']) - 10} more")
+
+    except GwcError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
 if __name__ == "__main__":
     main()
