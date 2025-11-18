@@ -1,6 +1,6 @@
 ---
 name: docs
-description: Google Docs document reading and analysis
+description: Google Docs document manipulation, reading, and analysis
 ---
 
 # Docs CLI Quick Reference
@@ -159,13 +159,122 @@ Phase 1 focuses on **reading and analyzing** documents:
 - ✅ Export in multiple formats
 - ✅ View document structure
 
-## Coming in Phase 2+
+## Phase 2: Text Manipulation & Formatting
 
-- Insert and delete text
-- Format text (bold, italic, color, size)
+Phase 2 enables **text editing and formatting**:
+- ✅ Insert text at specific positions
+- ✅ Delete text ranges
+- ✅ Replace text (single or all occurrences)
+- ✅ Format text (bold, italic, underline, strikethrough, color, font, size)
+- ✅ Format paragraphs (alignment, spacing, heading styles)
+
+### Phase 2 Commands
+
+#### Text Insertion & Deletion
+
+| Task | Command |
+|------|---------|
+| Insert text | `insert-text doc_id --text "Hello" --index 0` |
+| Delete text | `delete doc_id --start-index 0 --end-index 5` |
+| Replace text | `replace doc_id --find "old" --replace "new"` |
+
+#### Character Formatting
+
+| Option | Effect | Example |
+|--------|--------|---------|
+| `--bold` | Make text bold | `format-text doc_id --start-index 0 --end-index 5 --bold` |
+| `--italic` | Make text italic | `format-text doc_id --start-index 0 --end-index 5 --italic` |
+| `--underline` | Underline text | `format-text doc_id --start-index 0 --end-index 5 --underline` |
+| `--strikethrough` | Strike through text | `format-text doc_id --start-index 0 --end-index 5 --strikethrough` |
+| `--font TEXT` | Change font | `format-text doc_id --start-index 0 --end-index 5 --font "Arial"` |
+| `--size INT` | Change size (points) | `format-text doc_id --start-index 0 --end-index 5 --size 14` |
+| `--color HEX` | Change color | `format-text doc_id --start-index 0 --end-index 5 --color ff0000` |
+
+#### Paragraph Formatting
+
+| Option | Effect | Example |
+|--------|--------|---------|
+| `--align [left\|center\|right\|justify]` | Set alignment | `format-paragraph doc_id --start-index 0 --end-index 10 --align center` |
+| `--indent INT` | Set indentation (points) | `format-paragraph doc_id --start-index 0 --end-index 10 --indent 36` |
+| `--spacing-before INT` | Space before (points) | `format-paragraph doc_id --start-index 0 --end-index 10 --spacing-before 12` |
+| `--spacing-after INT` | Space after (points) | `format-paragraph doc_id --start-index 0 --end-index 10 --spacing-after 12` |
+| `--line-spacing FLOAT` | Line spacing multiplier | `format-paragraph doc_id --start-index 0 --end-index 10 --line-spacing 1.5` |
+| `--heading STYLE` | Heading style | `format-paragraph doc_id --start-index 0 --end-index 10 --heading HEADING_1` |
+
+Valid heading styles: `HEADING_1`, `HEADING_2`, `HEADING_3`, `HEADING_4`, `HEADING_5`, `HEADING_6`, `NORMAL_TEXT`
+
+### Phase 2 Examples
+
+**Template Variable Substitution:**
+```bash
+# Create from template
+gwc-docs create --title "Invoice {{date}}"
+DOC_ID="from_above"
+
+# Replace placeholders
+gwc-docs replace $DOC_ID --find "{{customer}}" --replace "Acme Corp"
+gwc-docs replace $DOC_ID --find "{{amount}}" --replace "1500.00"
+gwc-docs replace $DOC_ID --find "{{date}}" --replace "2025-11-18"
+```
+
+**Styled Document Creation:**
+```bash
+# Create document
+DOC_ID=$(poetry run gwc-docs create --title "Report" | grep id | cut -d'"' -f4)
+
+# Add and format title
+gwc-docs insert-text $DOC_ID --text "Executive Summary" --index 0
+gwc-docs format-text $DOC_ID --start-index 0 --end-index 18 --bold --size 16
+gwc-docs format-paragraph $DOC_ID --start-index 0 --end-index 18 --heading HEADING_1 --align center
+
+# Format body text
+gwc-docs insert-text $DOC_ID --text "\n\nContent here." --index 18
+gwc-docs format-paragraph $DOC_ID --start-index 19 --end-index 32 --line-spacing 1.5
+```
+
+**Bulk Text Updates:**
+```bash
+# Replace multiple instances
+gwc-docs replace $DOC_ID --find "TODO" --replace "DONE"
+
+# Format all instance (manual process)
+gwc-docs format-text $DOC_ID --start-index 0 --end-index 100 --italic
+```
+
+### Phase 2 Important Notes
+
+1. **Index System:**
+   - Indices are 0-based (position 0 is before first character)
+   - Use UTF-16 code unit positions
+   - Delete/insert operations affect subsequent indices
+   - Finding text position: use extracted text from `read` command
+
+2. **Replace Behavior:**
+   - Default: replaces ALL occurrences
+   - Use `--replace-all` flag to control (default=true)
+   - Use `--case-sensitive` for case matching (default=true)
+
+3. **Formatting:**
+   - Text formatting applies to character range
+   - Paragraph formatting applies to all paragraphs in range
+   - Multiple formatting options can be combined
+   - Font names should match Google Docs fonts (Arial, Courier New, Georgia, etc.)
+
+4. **Color Format:**
+   - Use 6-digit hex without # (e.g., `ff0000` for red)
+   - Format: `RRGGBB` where RR, GG, BB are hex values
+
+5. **Atomic Batch Updates:**
+   - Each operation is atomic (all or nothing)
+   - Multiple operations in sequence may fail individually
+   - For complex multi-step operations, consider Phase 4 batch updates
+
+## Coming in Phase 3+
+
 - Insert tables and manage rows/columns
-- Insert images
+- Insert images from URLs or files
 - Add headers, footers, page breaks
+- Insert footnotes and endnotes
 - Batch update operations
 - Document manipulation and editing
 

@@ -13,6 +13,12 @@ from gwc.docs.operations import (
     export_document_as_json,
     export_document_as_markdown,
     format_document_for_display,
+    find_text_position,
+    insert_text,
+    delete_text,
+    replace_text,
+    format_text,
+    format_paragraph,
 )
 from gwc.shared.output import format_output, OutputFormat
 
@@ -238,6 +244,152 @@ def export_markdown_cmd(document_id, output_file):
             click.echo(markdown)
     except Exception as e:
         click.echo(f"Error exporting document: {e}", err=True)
+        raise click.Abort()
+
+
+# ============================================================================
+# Phase 2: Text Manipulation & Formatting
+# ============================================================================
+
+
+@main.command()
+@click.argument("document_id")
+@click.option("--text", required=True, help="Text to insert")
+@click.option("--index", type=int, required=True, help="Position to insert at")
+def insert_text_cmd(document_id, text, index):
+    """Insert text at a specific position.
+
+    Examples:
+        gwc-docs insert-text doc_id --text "Hello" --index 0
+        gwc-docs insert-text doc_id --text " World" --index 5
+    """
+    try:
+        result = insert_text(document_id, text, index)
+        click.echo(f"Text inserted at index {index}")
+    except Exception as e:
+        click.echo(f"Error inserting text: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("document_id")
+@click.option("--start-index", type=int, required=True, help="Start position")
+@click.option("--end-index", type=int, required=True, help="End position")
+def delete_cmd(document_id, start_index, end_index):
+    """Delete text from a range.
+
+    Examples:
+        gwc-docs delete doc_id --start-index 0 --end-index 5
+        gwc-docs delete doc_id --start-index 10 --end-index 20
+    """
+    try:
+        result = delete_text(document_id, start_index, end_index)
+        click.echo(f"Text deleted from index {start_index} to {end_index}")
+    except Exception as e:
+        click.echo(f"Error deleting text: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("document_id")
+@click.option("--find", required=True, help="Text to find")
+@click.option("--replace", required=True, help="Text to replace with")
+@click.option("--replace-all", is_flag=True, default=True, help="Replace all occurrences")
+@click.option("--case-sensitive", is_flag=True, default=True, help="Case sensitive search")
+def replace_cmd(document_id, find, replace, replace_all, case_sensitive):
+    """Replace text in document.
+
+    Examples:
+        gwc-docs replace doc_id --find "old" --replace "new"
+        gwc-docs replace doc_id --find "{{name}}" --replace "John"
+    """
+    try:
+        result = replace_text(document_id, find, replace, replace_all, case_sensitive)
+        click.echo(f"Text replaced: '{find}' -> '{replace}'")
+    except Exception as e:
+        click.echo(f"Error replacing text: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("document_id")
+@click.option("--start-index", type=int, required=True, help="Start position")
+@click.option("--end-index", type=int, required=True, help="End position")
+@click.option("--bold", is_flag=True, help="Make bold")
+@click.option("--italic", is_flag=True, help="Make italic")
+@click.option("--underline", is_flag=True, help="Make underlined")
+@click.option("--strikethrough", is_flag=True, help="Apply strikethrough")
+@click.option("--font", help="Font name (e.g., Arial, Courier New)")
+@click.option("--size", type=int, help="Font size in points")
+@click.option("--color", help="Color as hex (e.g., ff0000 for red)")
+def format_text_cmd(
+    document_id, start_index, end_index, bold, italic, underline, strikethrough, font, size, color
+):
+    """Apply character formatting to text range.
+
+    Examples:
+        gwc-docs format-text doc_id --start-index 0 --end-index 5 --bold
+        gwc-docs format-text doc_id --start-index 10 --end-index 15 --italic --color ff0000
+        gwc-docs format-text doc_id --start-index 20 --end-index 30 --font "Arial" --size 14
+    """
+    try:
+        result = format_text(
+            document_id,
+            start_index,
+            end_index,
+            bold=bold,
+            italic=italic,
+            underline=underline,
+            strikethrough=strikethrough,
+            font=font,
+            size=size,
+            color=color,
+        )
+        click.echo(f"Text formatted from index {start_index} to {end_index}")
+    except Exception as e:
+        click.echo(f"Error formatting text: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("document_id")
+@click.option("--start-index", type=int, required=True, help="Start position")
+@click.option("--end-index", type=int, required=True, help="End position")
+@click.option("--align", type=click.Choice(["left", "center", "right", "justify"]), help="Alignment")
+@click.option("--indent", type=int, help="Indentation in points")
+@click.option("--spacing-before", type=int, help="Space before paragraph in points")
+@click.option("--spacing-after", type=int, help="Space after paragraph in points")
+@click.option("--line-spacing", type=float, help="Line spacing multiplier (1.0, 1.5, 2.0)")
+@click.option(
+    "--heading",
+    type=click.Choice(["HEADING_1", "HEADING_2", "HEADING_3", "HEADING_4", "HEADING_5", "HEADING_6", "NORMAL_TEXT"]),
+    help="Heading style",
+)
+def format_paragraph_cmd(
+    document_id, start_index, end_index, align, indent, spacing_before, spacing_after, line_spacing, heading
+):
+    """Apply paragraph formatting.
+
+    Examples:
+        gwc-docs format-paragraph doc_id --start-index 0 --end-index 10 --align center
+        gwc-docs format-paragraph doc_id --start-index 20 --end-index 30 --heading HEADING_1
+        gwc-docs format-paragraph doc_id --start-index 40 --end-index 50 --spacing-after 12 --line-spacing 1.5
+    """
+    try:
+        result = format_paragraph(
+            document_id,
+            start_index,
+            end_index,
+            alignment=align,
+            indent=indent,
+            spacing_before=spacing_before,
+            spacing_after=spacing_after,
+            line_spacing=line_spacing,
+            heading_style=heading,
+        )
+        click.echo(f"Paragraph formatted from index {start_index} to {end_index}")
+    except Exception as e:
+        click.echo(f"Error formatting paragraph: {e}", err=True)
         raise click.Abort()
 
 

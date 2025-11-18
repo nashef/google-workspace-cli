@@ -201,3 +201,232 @@ class TestCommandInvocation:
             catch_exceptions=False,
         )
         assert result.exit_code in [0, 1]
+
+
+class TestPhase2TextOperations:
+    """Test Phase 2 text manipulation and formatting commands."""
+
+    def test_insert_text_help(self, runner):
+        """Test insert-text command help."""
+        result = runner.invoke(docs_cli.main, ["insert-text", "--help"])
+        assert result.exit_code == 0
+        assert "DOCUMENT_ID" in result.output
+        assert "--text" in result.output
+        assert "--index" in result.output
+
+    def test_delete_help(self, runner):
+        """Test delete command help."""
+        result = runner.invoke(docs_cli.main, ["delete", "--help"])
+        assert result.exit_code == 0
+        assert "DOCUMENT_ID" in result.output
+        assert "--start-index" in result.output
+        assert "--end-index" in result.output
+
+    def test_replace_help(self, runner):
+        """Test replace command help."""
+        result = runner.invoke(docs_cli.main, ["replace", "--help"])
+        assert result.exit_code == 0
+        assert "DOCUMENT_ID" in result.output
+        assert "--find" in result.output
+        assert "--replace" in result.output
+
+    def test_format_text_help(self, runner):
+        """Test format-text command help."""
+        result = runner.invoke(docs_cli.main, ["format-text", "--help"])
+        assert result.exit_code == 0
+        assert "DOCUMENT_ID" in result.output
+        assert "--start-index" in result.output
+        assert "--end-index" in result.output
+        assert "--bold" in result.output
+        assert "--italic" in result.output
+        assert "--color" in result.output
+
+    def test_format_paragraph_help(self, runner):
+        """Test format-paragraph command help."""
+        result = runner.invoke(docs_cli.main, ["format-paragraph", "--help"])
+        assert result.exit_code == 0
+        assert "DOCUMENT_ID" in result.output
+        assert "--align" in result.output
+        assert "--heading" in result.output
+        assert "--line-spacing" in result.output
+
+
+class TestPhase2TextOperationsMissing:
+    """Test error handling for Phase 2 text operations."""
+
+    def test_insert_text_missing_text(self, runner):
+        """Test insert-text without text."""
+        result = runner.invoke(docs_cli.main, ["insert-text", "test_id", "--index", "0"])
+        assert result.exit_code != 0
+
+    def test_insert_text_missing_index(self, runner):
+        """Test insert-text without index."""
+        result = runner.invoke(docs_cli.main, ["insert-text", "test_id", "--text", "hello"])
+        assert result.exit_code != 0
+
+    def test_insert_text_without_document_id(self, runner):
+        """Test insert-text without document ID."""
+        result = runner.invoke(docs_cli.main, ["insert-text", "--text", "hello", "--index", "0"])
+        assert result.exit_code != 0
+
+    def test_delete_missing_indices(self, runner):
+        """Test delete without indices."""
+        result = runner.invoke(docs_cli.main, ["delete", "test_id"])
+        assert result.exit_code != 0
+
+    def test_delete_without_document_id(self, runner):
+        """Test delete without document ID."""
+        result = runner.invoke(docs_cli.main, ["delete", "--start-index", "0", "--end-index", "5"])
+        assert result.exit_code != 0
+
+    def test_replace_missing_find(self, runner):
+        """Test replace without find."""
+        result = runner.invoke(docs_cli.main, ["replace", "test_id", "--replace", "new"])
+        assert result.exit_code != 0
+
+    def test_replace_missing_replace(self, runner):
+        """Test replace without replace."""
+        result = runner.invoke(docs_cli.main, ["replace", "test_id", "--find", "old"])
+        assert result.exit_code != 0
+
+    def test_replace_without_document_id(self, runner):
+        """Test replace without document ID."""
+        result = runner.invoke(docs_cli.main, ["replace", "--find", "old", "--replace", "new"])
+        assert result.exit_code != 0
+
+    def test_format_text_missing_indices(self, runner):
+        """Test format-text without indices."""
+        result = runner.invoke(docs_cli.main, ["format-text", "test_id", "--bold"])
+        assert result.exit_code != 0
+
+    def test_format_text_without_document_id(self, runner):
+        """Test format-text without document ID."""
+        result = runner.invoke(docs_cli.main, ["format-text", "--start-index", "0", "--end-index", "5", "--bold"])
+        assert result.exit_code != 0
+
+    def test_format_paragraph_missing_indices(self, runner):
+        """Test format-paragraph without indices."""
+        result = runner.invoke(docs_cli.main, ["format-paragraph", "test_id", "--align", "center"])
+        assert result.exit_code != 0
+
+    def test_format_paragraph_without_document_id(self, runner):
+        """Test format-paragraph without document ID."""
+        result = runner.invoke(docs_cli.main, ["format-paragraph", "--start-index", "0", "--end-index", "5"])
+        assert result.exit_code != 0
+
+    def test_format_paragraph_invalid_alignment(self, runner):
+        """Test format-paragraph with invalid alignment."""
+        result = runner.invoke(
+            docs_cli.main,
+            ["format-paragraph", "test_id", "--start-index", "0", "--end-index", "5", "--align", "invalid"],
+        )
+        assert result.exit_code != 0
+
+    def test_format_paragraph_invalid_heading(self, runner):
+        """Test format-paragraph with invalid heading."""
+        result = runner.invoke(
+            docs_cli.main,
+            ["format-paragraph", "test_id", "--start-index", "0", "--end-index", "5", "--heading", "INVALID"],
+        )
+        assert result.exit_code != 0
+
+
+class TestPhase2CommandInvocation:
+    """Test that all Phase 2 commands can be invoked."""
+
+    def test_insert_text_invocation(self, runner):
+        """Test insert-text command invocation."""
+        result = runner.invoke(
+            docs_cli.main,
+            ["insert-text", "test_id", "--text", "Hello", "--index", "0"],
+            catch_exceptions=False,
+        )
+        # May fail with auth error, but command structure should be valid
+        assert result.exit_code in [0, 1]
+
+    def test_delete_invocation(self, runner):
+        """Test delete command invocation."""
+        result = runner.invoke(
+            docs_cli.main,
+            ["delete", "test_id", "--start-index", "0", "--end-index", "5"],
+            catch_exceptions=False,
+        )
+        assert result.exit_code in [0, 1]
+
+    def test_replace_invocation(self, runner):
+        """Test replace command invocation."""
+        result = runner.invoke(
+            docs_cli.main,
+            ["replace", "test_id", "--find", "old", "--replace", "new"],
+            catch_exceptions=False,
+        )
+        assert result.exit_code in [0, 1]
+
+    def test_format_text_with_bold(self, runner):
+        """Test format-text with bold."""
+        result = runner.invoke(
+            docs_cli.main,
+            ["format-text", "test_id", "--start-index", "0", "--end-index", "5", "--bold"],
+            catch_exceptions=False,
+        )
+        assert result.exit_code in [0, 1]
+
+    def test_format_text_with_formatting(self, runner):
+        """Test format-text with multiple formatting options."""
+        result = runner.invoke(
+            docs_cli.main,
+            [
+                "format-text",
+                "test_id",
+                "--start-index",
+                "0",
+                "--end-index",
+                "10",
+                "--bold",
+                "--italic",
+                "--font",
+                "Arial",
+                "--size",
+                "14",
+            ],
+            catch_exceptions=False,
+        )
+        assert result.exit_code in [0, 1]
+
+    def test_format_paragraph_with_alignment(self, runner):
+        """Test format-paragraph with alignment."""
+        result = runner.invoke(
+            docs_cli.main,
+            ["format-paragraph", "test_id", "--start-index", "0", "--end-index", "10", "--align", "center"],
+            catch_exceptions=False,
+        )
+        assert result.exit_code in [0, 1]
+
+    def test_format_paragraph_with_heading(self, runner):
+        """Test format-paragraph with heading."""
+        result = runner.invoke(
+            docs_cli.main,
+            ["format-paragraph", "test_id", "--start-index", "0", "--end-index", "10", "--heading", "HEADING_1"],
+            catch_exceptions=False,
+        )
+        assert result.exit_code in [0, 1]
+
+    def test_format_paragraph_with_spacing(self, runner):
+        """Test format-paragraph with spacing options."""
+        result = runner.invoke(
+            docs_cli.main,
+            [
+                "format-paragraph",
+                "test_id",
+                "--start-index",
+                "0",
+                "--end-index",
+                "10",
+                "--spacing-after",
+                "12",
+                "--line-spacing",
+                "1.5",
+            ],
+            catch_exceptions=False,
+        )
+        assert result.exit_code in [0, 1]
