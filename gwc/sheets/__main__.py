@@ -40,8 +40,7 @@ def main():
 @click.option(
     "--sheets",
     multiple=True,
-    default=["Sheet1"],
-    help="Sheet names (can specify multiple)",
+    help="Sheet names (can specify multiple, defaults to Sheet1)",
 )
 @click.option(
     "--output",

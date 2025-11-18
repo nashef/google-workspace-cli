@@ -12,11 +12,7 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 import json
 from pathlib import Path
-
-SCOPES = [
-    "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/drive",
-]
+from gwc.shared.auth import ALL_SCOPES
 
 _sheets_service = None
 
@@ -40,7 +36,7 @@ def _load_credentials() -> Credentials:
             "No token found. Run 'gwc auth' to authenticate first."
         )
 
-    creds = Credentials.from_authorized_user_file(str(token_path), SCOPES)
+    creds = Credentials.from_authorized_user_file(str(token_path), ALL_SCOPES)
 
     # Refresh if expired
     if creds.expired and creds.refresh_token:
