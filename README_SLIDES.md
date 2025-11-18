@@ -307,13 +307,492 @@ gwc-slides create --title "Q4 Report"
 | 3 | 📋 Planned | Large | Content operations |
 | 4 | 📋 Planned | Large | Advanced features |
 
+## REST API Reference
+
+Complete reference of Google Slides API v1 endpoints and request/response structures.
+
+### Presentations Resource
+
+#### **POST /v1/presentations** - Create Presentation
+
+```json
+POST https://slides.googleapis.com/v1/presentations
+Authorization: Bearer {access_token}
+
+Request Body:
+{
+  "title": "My Presentation"
+}
+
+Response:
+{
+  "presentationId": "string",
+  "title": "My Presentation",
+  "locale": "en_US",
+  "autoRecalcOnChange": true,
+  "revisionId": "string",
+  "suggestionsViewMode": "SUGGESTIONS_INLINE",
+  "slides": [],
+  "layouts": [],
+  "masters": []
+}
+```
+
+#### **GET /v1/presentations/{presentationId}** - Get Presentation
+
+```json
+GET https://slides.googleapis.com/v1/presentations/{presentationId}
+Authorization: Bearer {access_token}
+
+Query Parameters:
+  - fields: string (optional) - Fields to include in response
+
+Response:
+{
+  "presentationId": "string",
+  "title": "Presentation Title",
+  "locale": "en_US",
+  "slides": [
+    {
+      "objectId": "slide-1",
+      "pageElements": [...],
+      "layoutObjectId": "layout-1",
+      "properties": {
+        "name": "Slide 1",
+        "pageSize": {
+          "width": { "magnitude": 9144000, "unit": "EMU" },
+          "height": { "magnitude": 6858000, "unit": "EMU" }
+        }
+      }
+    }
+  ],
+  "layouts": [
+    {
+      "objectId": "layout-1",
+      "layoutProperties": { "name": "Title Slide" }
+    }
+  ]
+}
+```
+
+#### **POST /v1/presentations/{presentationId}:batchUpdate** - Batch Update
+
+```json
+POST https://slides.googleapis.com/v1/presentations/{presentationId}:batchUpdate
+Authorization: Bearer {access_token}
+Content-Type: application/json
+
+Request Body:
+{
+  "requests": [
+    {
+      "addSlide": {
+        "objectId": "slide-2",
+        "insertionIndex": 1,
+        "slideLayoutObjectId": "layout-1"
+      }
+    },
+    {
+      "createShape": {
+        "objectId": "textbox-1",
+        "shapeType": "TEXT_BOX",
+        "elementProperties": {
+          "pageObjectId": "slide-2",
+          "transform": {
+            "scaleX": 1,
+            "scaleY": 1,
+            "translateX": 100000,
+            "translateY": 100000,
+            "unit": "EMU"
+          },
+          "size": {
+            "width": { "magnitude": 3000000, "unit": "EMU" },
+            "height": { "magnitude": 500000, "unit": "EMU" }
+          }
+        },
+        "text": {
+          "textElements": [
+            {
+              "textRun": {
+                "content": "Hello World\n",
+                "style": {
+                  "fontSize": { "magnitude": 24, "unit": "PT" },
+                  "bold": true
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
+
+Response:
+{
+  "presentationId": "presentation-id",
+  "replies": [
+    {
+      "addSlide": {
+        "objectId": "slide-2"
+      }
+    },
+    {
+      "createShape": {
+        "objectId": "textbox-1"
+      }
+    }
+  ]
+}
+```
+
+### Request Types for batchUpdate
+
+#### **addSlide** - Add New Slide
+
+```json
+{
+  "addSlide": {
+    "objectId": "slide-2",
+    "insertionIndex": 1,
+    "slideLayoutObjectId": "layout-1"
+  }
+}
+```
+
+#### **deleteObject** - Delete Element
+
+```json
+{
+  "deleteObject": {
+    "objectId": "slide-1"
+  }
+}
+```
+
+#### **duplicateObject** - Duplicate Element
+
+```json
+{
+  "duplicateObject": {
+    "objectId": "slide-1",
+    "objectIds": {
+      "slide-1": "slide-1-copy"
+    }
+  }
+}
+```
+
+#### **createShape** - Create Shape or Text Box
+
+```json
+{
+  "createShape": {
+    "objectId": "shape-1",
+    "shapeType": "RECTANGLE",
+    "elementProperties": {
+      "pageObjectId": "slide-1",
+      "transform": {
+        "scaleX": 1,
+        "scaleY": 1,
+        "translateX": 100000,
+        "translateY": 100000,
+        "unit": "EMU"
+      },
+      "size": {
+        "width": { "magnitude": 1000000, "unit": "EMU" },
+        "height": { "magnitude": 1000000, "unit": "EMU" }
+      }
+    }
+  }
+}
+
+Shape Types:
+- RECTANGLE
+- ELLIPSE
+- TRIANGLE
+- PARALLELOGRAM
+- STAR
+- HEART
+- DIAMOND
+- PLUS
+- HEXAGON
+- CLOUD
+- PENTAGON
+- WAVE
+- FLOWCHART_PROCESS
+- FLOWCHART_DECISION
+```
+
+#### **createImage** - Insert Image
+
+```json
+{
+  "createImage": {
+    "objectId": "image-1",
+    "url": "https://example.com/image.png",
+    "elementProperties": {
+      "pageObjectId": "slide-1",
+      "transform": {
+        "scaleX": 1,
+        "scaleY": 1,
+        "translateX": 100000,
+        "translateY": 100000,
+        "unit": "EMU"
+      },
+      "size": {
+        "width": { "magnitude": 2000000, "unit": "EMU" },
+        "height": { "magnitude": 2000000, "unit": "EMU" }
+      }
+    }
+  }
+}
+```
+
+#### **updatePageProperties** - Update Slide Properties
+
+```json
+{
+  "updatePageProperties": {
+    "objectId": "slide-1",
+    "pageProperties": {
+      "name": "Title Slide",
+      "pageSize": {
+        "width": { "magnitude": 9144000, "unit": "EMU" },
+        "height": { "magnitude": 6858000, "unit": "EMU" }
+      }
+    },
+    "fields": "name"
+  }
+}
+```
+
+#### **updateShapeProperties** - Update Shape Properties
+
+```json
+{
+  "updateShapeProperties": {
+    "objectId": "shape-1",
+    "shapeProperties": {
+      "shapeBackgroundFill": {
+        "solidFill": {
+          "color": {
+            "rgbColor": {
+              "red": 1.0,
+              "green": 0.0,
+              "blue": 0.0
+            }
+          }
+        }
+      }
+    },
+    "fields": "shapeBackgroundFill"
+  }
+}
+```
+
+### Element Positioning (EMU Coordinates)
+
+**EMU = English Metric Units**
+- 1 inch = 914,400 EMU
+- Slide dimensions: 10 × 7.5 inches (9,144,000 × 6,858,000 EMU)
+
+**Common Conversions:**
+```
+1 inch   = 914,400 EMU
+0.5 inch = 457,200 EMU
+0.1 inch = 91,440 EMU
+1 cm     = 360,000 EMU (approximately)
+1 mm     = 36,000 EMU (approximately)
+```
+
+### Element Properties Structure
+
+```json
+"elementProperties": {
+  "pageObjectId": "slide-1",
+  "transform": {
+    "scaleX": 1,
+    "scaleY": 1,
+    "translateX": 100000,
+    "translateY": 100000,
+    "unit": "EMU"
+  },
+  "size": {
+    "width": { "magnitude": 3000000, "unit": "EMU" },
+    "height": { "magnitude": 500000, "unit": "EMU" }
+  },
+  "rotation": 0,
+  "shapeType": "TEXT_BOX"
+}
+```
+
+### Text Formatting
+
+```json
+"style": {
+  "fontSize": { "magnitude": 24, "unit": "PT" },
+  "bold": true,
+  "italic": false,
+  "underline": false,
+  "strikethrough": false,
+  "foregroundColor": {
+    "opaqueColor": {
+      "rgbColor": {
+        "red": 0.0,
+        "green": 0.0,
+        "blue": 0.0
+      }
+    }
+  },
+  "fontFamily": "Arial",
+  "baselineOffset": "NONE"
+}
+```
+
+### Color Representation
+
+```json
+"color": {
+  "rgbColor": {
+    "red": 1.0,    // 0-1 (0=black, 1=full red)
+    "green": 0.5,
+    "blue": 0.0
+  }
+}
+```
+
+### Common Patterns
+
+#### Creating Text Box with Content
+
+```json
+{
+  "requests": [
+    {
+      "createShape": {
+        "objectId": "text-box-1",
+        "shapeType": "TEXT_BOX",
+        "elementProperties": {
+          "pageObjectId": "slide-1",
+          "transform": {
+            "scaleX": 1,
+            "scaleY": 1,
+            "translateX": 500000,
+            "translateY": 500000,
+            "unit": "EMU"
+          },
+          "size": {
+            "width": { "magnitude": 2000000, "unit": "EMU" },
+            "height": { "magnitude": 1000000, "unit": "EMU" }
+          }
+        },
+        "text": {
+          "textElements": [
+            {
+              "textRun": {
+                "content": "Your text here\n",
+                "style": {
+                  "fontSize": { "magnitude": 18, "unit": "PT" },
+                  "fontFamily": "Arial",
+                  "foregroundColor": {
+                    "opaqueColor": {
+                      "rgbColor": {
+                        "red": 0.0,
+                        "green": 0.0,
+                        "blue": 0.0
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
+```
+
+#### Creating Colored Rectangle
+
+```json
+{
+  "requests": [
+    {
+      "createShape": {
+        "objectId": "rect-1",
+        "shapeType": "RECTANGLE",
+        "elementProperties": {
+          "pageObjectId": "slide-1",
+          "transform": {
+            "translateX": 100000,
+            "translateY": 100000,
+            "unit": "EMU"
+          },
+          "size": {
+            "width": { "magnitude": 1000000, "unit": "EMU" },
+            "height": { "magnitude": 1000000, "unit": "EMU" }
+          }
+        }
+      }
+    },
+    {
+      "updateShapeProperties": {
+        "objectId": "rect-1",
+        "shapeProperties": {
+          "shapeBackgroundFill": {
+            "solidFill": {
+              "color": {
+                "rgbColor": {
+                  "red": 0.2,
+                  "green": 0.5,
+                  "blue": 0.8
+                }
+              }
+            }
+          }
+        },
+        "fields": "shapeBackgroundFill"
+      }
+    }
+  ]
+}
+```
+
+#### Multi-Step Batch Operation
+
+```json
+{
+  "requests": [
+    { "addSlide": { "objectId": "slide-2" } },
+    { "createShape": { "objectId": "title", "shapeType": "TEXT_BOX", ... } },
+    { "createShape": { "objectId": "body", "shapeType": "TEXT_BOX", ... } },
+    { "createImage": { "objectId": "img-1", "url": "...", ... } },
+    { "updatePageProperties": { "objectId": "slide-2", ... } }
+  ]
+}
+```
+
+## Field Masks
+
+When updating properties, specify which fields to update:
+
+```
+fields: "name"                    # Update slide name
+fields: "shapeBackgroundFill"     # Update shape fill color
+fields: "transform,size"          # Update position and size
+fields: "text"                    # Update text content
+```
+
 ## Next Steps
 
 1. **Phase 1**: Core operations ✅
-2. **Phase 2**: Slide management (add, delete, reorder)
-3. **Phase 3**: Content insertion (text, images, shapes)
-4. **Phase 4**: Advanced features (themes, export, batch)
+2. **Phase 2**: Slide management (add, delete, reorder) ✅
+3. **Phase 3**: Content insertion (text, images, shapes) ✅
+4. **Phase 4**: Advanced features (themes, export, batch) ✅
 
 ---
 
-**Note:** Slides API implementation is lower priority than Sheets/Docs. Check back for progress updates.
+**Status:** Full Slides API implementation complete with 12 commands and comprehensive test coverage (33 tests).
