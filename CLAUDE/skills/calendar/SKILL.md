@@ -1,48 +1,102 @@
 ---
 name: calendar
-description: Comprehensive google calendar management (Phases 1-4 complete).
+description: Google Calendar management and event operations
 ---
 
-## Status
+# Calendar CLI Quick Reference
 
-✅ **Phase 1**: Basic event CRUD (create, read, update, delete)
-✅ **Phase 2**: Attendee management (add/remove, notifications)
-✅ **Phase 3**: Reminders and notifications
-✅ **Phase 4**: Recurring events (daily, weekly, monthly, custom patterns)
-
-All core calendar functionality is fully implemented and tested.
-
-## IMPORTANT: Timezone & Date Handling
-
-**Abby runs in UTC. Leaf is in Mountain Time (UTC-07:00).**
-
-When working with dates and times:
-1. **Always use explicit timezone offsets** in ISO8601 format (e.g., `2025-01-20T14:00:00-07:00`)
-2. **Be careful with "today" vs "tomorrow"** - if it's 1 AM UTC, it's still the previous day in Mountain time
-3. **When updating event times, ALWAYS update duration too** to keep the end time consistent
-
-**Pro tip**: Use `date` command to check current time in different zones.
+Base command: `poetry run gwc-cal <command>`
 
 ## Quick Start
 
-All commands run from `~/Jarvis/sagas/src/google-workspace-cli` using `poetry run gwc-cal <command>`.
-
-### Most Common Tasks
-
-**See today's events:**
 ```bash
+# See today's events
 poetry run gwc-cal find --output llm
-```
 
-**Create a basic meeting:**
-```bash
+# Create basic event
 poetry run gwc-cal create \
   --time "2025-01-20T14:00:00-07:00" \
   --subject "Team Meeting" \
   --duration 60
+
+# Get event details
+poetry run gwc-cal get event_id --output json
+
+# List all calendars
+poetry run gwc-cal list --output llm
 ```
 
-**Create meeting with Google Meet and attendees:**
+## Timezone Notice
+
+Calendar uses ISO8601 with explicit timezone offsets. Examples:
+- Mountain Time: `2025-01-20T14:00:00-07:00`
+- Pacific Time: `2025-01-20T14:00:00-08:00`
+- Eastern Time: `2025-01-20T14:00:00-05:00`
+- UTC: `2025-01-20T21:00:00Z`
+
+**When updating times, always update duration too to keep end time consistent.**
+
+## Event Operations
+
+| Task | Command |
+|------|---------|
+| Create basic event | `create --time "ISO8601" --subject "..." --duration MINS` |
+| Create with location | `create --time "..." --subject "..." --duration MINS --location "Room A"` |
+| Add attendees | `create ... --attendees "alice@co.com,bob@co.com"` |
+| Add Google Meet | `create ... --meet` |
+| Create with description | `create ... --description "Details..."` |
+| List events (date range) | `find --start 2025-01-15 --end 2025-01-22 --output llm` |
+| Find today | `find --output llm` |
+| Search by keyword | `find --query "standup" --output llm` |
+| Get event details | `get event_id --output json` |
+| Update time | `update event_id --time "ISO8601" --duration MINS` |
+| Add attendee | `update event_id --add-attendee "email@co.com" --notify all` |
+| Remove attendee | `update event_id --remove-attendee "email@co.com"` |
+| Delete event | `delete event_id` |
+
+## Common Options
+
+- `--time TEXT` - Start time (ISO8601 with timezone)
+- `--duration INTEGER` - Event duration in minutes
+- `--subject TEXT` - Event title
+- `--location TEXT` - Physical location or room
+- `--attendees "email1,email2"` - Comma-separated emails
+- `--description TEXT` - Event details
+- `--meet` - Add Google Meet link
+- `--notify [all|externalOnly|none]` - Notification level
+- `--transparency [opaque|transparent]` - Show as busy/free
+- `--output [unix|json|llm]` - Output format
+
+## Calendar Commands
+
+| Command | Purpose |
+|---------|---------|
+| `list` | Show all calendars |
+| `create` | Create new event |
+| `update` | Modify existing event |
+| `delete` | Remove event |
+| `find` | Search/list events in date range |
+| `get` | Get event details |
+| `config` | Manage settings |
+| `auth` | Re-authenticate |
+
+## Output Formats
+
+- `--output unix` - Tab-separated (default, scripting)
+- `--output json` - JSON (programmatic parsing)
+- `--output llm` - Human-readable (recommended)
+
+## Tips
+
+1. Always use explicit timezones in ISO8601 format
+2. When updating event time, always update duration
+3. Use `find --output llm` for human-readable event lists
+4. Multiple reminders supported (see ADVANCED.md)
+5. Use `--add-attendee`/`--remove-attendee` to modify attendee list
+
+## Common Workflows
+
+**Create meeting with team:**
 ```bash
 poetry run gwc-cal create \
   --time "2025-01-20T14:00:00-07:00" \
@@ -50,104 +104,37 @@ poetry run gwc-cal create \
   --duration 30 \
   --attendees "alice@company.com,bob@company.com" \
   --meet \
-  --location "Conference Room A"
+  --notify all
 ```
 
-**Create recurring event (weekly standup):**
+**Add someone to existing event:**
 ```bash
-poetry run gwc-cal create \
-  --time "2025-01-20T09:00:00-07:00" \
-  --subject "Weekly Standup" \
-  --duration 30 \
-  --attendees "alice@company.com,bob@company.com" \
-  --recurrence "FREQ=WEEKLY;BYDAY=MO,WE,FR;COUNT=12"
-```
-
-**Add reminders to event:**
-```bash
-poetry run gwc-cal create \
-  --time "2025-01-20T14:00:00-07:00" \
-  --subject "Client Call" \
-  --duration 60 \
-  --reminder "15 minutes" \
-  --reminder "1 day"
-```
-
-**Update an event (remember duration!):**
-```bash
-poetry run gwc-cal update <event-id> \
-  --time "2025-01-20T15:00:00-07:00" \
-  --duration 60
-```
-
-**Add attendees to existing event:**
-```bash
-poetry run gwc-cal update <event-id> \
+poetry run gwc-cal update event_id \
   --add-attendee "newperson@company.com" \
   --notify all
 ```
 
-**Delete an event:**
-```bash
-poetry run gwc-cal delete <event-id>
-```
-
-### Finding Events
-
-**This week:**
-```bash
-poetry run gwc-cal find --output llm
-```
-
-**Specific date range:**
+**Check calendar for date range:**
 ```bash
 poetry run gwc-cal find --start 2025-01-15 --end 2025-01-22 --output llm
 ```
 
-**Search by keyword:**
+**Update event time (don't forget duration!):**
 ```bash
-poetry run gwc-cal find --query "standup" --output llm
+poetry run gwc-cal update event_id \
+  --time "2025-01-20T15:00:00-07:00" \
+  --duration 60
 ```
 
-## Output Formats
+## Advanced Features
 
-- `--output unix` - Tab-separated (default, for scripting)
-- `--output json` - JSON (for programmatic parsing)
-- `--output llm` - Human-readable (use this most of the time!)
-
-## Common Options
-
-Most create/update commands support:
-- `--meet` - Add Google Meet link
-- `--location TEXT` - Physical location or room
-- `--attendees "email1,email2"` - Invite people
-- `--description TEXT` - Event details
-- `--notify [all|externalOnly|none]` - Email notifications
-- `--transparency [opaque|transparent]` - Show as busy/free
-- `--recurrence TEXT` - Recurring events (see REFERENCE.md)
-- `--reminder TEXT` - Custom reminders (see REFERENCE.md)
-
-## For Complex Tasks
-
-See **REFERENCE.md** in this directory for:
-- Complete option reference for all commands
-- Recurring event patterns
-- Custom reminder syntax
-- Visibility and transparency settings
-- Adding/removing individual attendees
-- Reading descriptions from files
-- Config management
-
-## Quick Command List
-
-- `list` - Show all calendars
-- `create` - Create new event
-- `update` - Modify event
-- `delete` - Remove event
-- `find` - Search/list events
-- `get` - Get event details
-- `config` - Manage settings
-- `auth` - Re-authenticate
+For Phase 2-4 features, see **ADVANCED.md**:
+- Recurring events (RRULE syntax)
+- Multiple reminders
+- Attendee management
+- Visibility & transparency
+- Google Meet integration
+- Timezone handling
 
 ## Help
 
@@ -155,3 +142,8 @@ Get detailed help for any command:
 ```bash
 poetry run gwc-cal <command> --help
 ```
+
+## Documentation
+
+- **REFERENCE.md** - Complete command reference, field descriptions, recurrence patterns
+- **ADVANCED.md** - Recurring events, reminders, attendee management, timezone handling
