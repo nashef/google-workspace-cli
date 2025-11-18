@@ -25,8 +25,14 @@ GMAIL_SCOPES = [
     "https://www.googleapis.com/auth/gmail.send"
 ]
 
+# Google People API scopes
+PEOPLE_SCOPES = [
+    "https://www.googleapis.com/auth/contacts",
+    "https://www.googleapis.com/auth/contacts.readonly"
+]
+
 # Union of all scopes we might need
-ALL_SCOPES = list(set(CALENDAR_SCOPES + GMAIL_SCOPES))
+ALL_SCOPES = list(set(CALENDAR_SCOPES + GMAIL_SCOPES + PEOPLE_SCOPES))
 
 
 def authenticate_interactive(scopes: Optional[list] = None) -> Credentials:
