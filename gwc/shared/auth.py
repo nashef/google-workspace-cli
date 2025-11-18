@@ -59,21 +59,44 @@ def authenticate_interactive(scopes: Optional[list] = None) -> Credentials:
             scopes=scopes
         )
 
-        # Run local server for callback (non-interactive fallback if needed)
-        creds = flow.run_local_server(port=0)
+        # Try to run local server for callback
+        try:
+            creds = flow.run_local_server(port=0, open_browser=False)
+        except Exception as local_server_error:
+            # Fallback to manual code entry
+            import sys
+            print("\n" + "="*70, file=sys.stderr)
+            print("Browser-based authentication failed. Using manual code entry.", file=sys.stderr)
+            print("="*70 + "\n", file=sys.stderr)
+
+            auth_url, _ = flow.authorization_url(prompt='consent')
+            print(f"Please visit this URL to authorize:\n\n{auth_url}\n", file=sys.stderr)
+            print("After authorizing, you'll be redirected. Copy the authorization code from the URL.", file=sys.stderr)
+            print("(It will be in the 'code' parameter)\n", file=sys.stderr)
+
+            code = input("Enter the authorization code: ").strip()
+            if not code:
+                raise AuthenticationError("No authorization code provided")
+
+            try:
+                creds = flow.fetch_token(code=code)
+            except Exception as e:
+                raise AuthenticationError(f"Failed to exchange code for token: {e}")
 
         # Save the token
         config.save_token({
-            'token': creds.token,
-            'refresh_token': creds.refresh_token,
-            'token_uri': creds.token_uri,
-            'client_id': creds.client_id,
-            'client_secret': creds.client_secret,
-            'scopes': creds.scopes
+            'token': creds.get('access_token') or getattr(creds, 'token', None),
+            'refresh_token': creds.get('refresh_token') or getattr(creds, 'refresh_token', None),
+            'token_uri': creds.get('token_uri') or getattr(creds, 'token_uri', None),
+            'client_id': creds.get('client_id') or getattr(creds, 'client_id', None),
+            'client_secret': creds.get('client_secret') or getattr(creds, 'client_secret', None),
+            'scopes': scopes
         })
 
         return creds
 
+    except AuthenticationError:
+        raise
     except Exception as e:
         raise AuthenticationError(f"OAuth2 authentication failed: {e}")
 
