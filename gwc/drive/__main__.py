@@ -50,6 +50,11 @@ from gwc.drive.operations import (
     delete_comment,
     create_reply,
     list_replies,
+    generate_ids,
+    list_apps,
+    get_app,
+    create_channel,
+    stop_channel,
 )
 from gwc.shared.output import format_output, OutputFormat
 
@@ -1115,6 +1120,128 @@ def list_replies_cmd(file_id, comment_id, output):
         click.echo(format_output(replies, output))
     except Exception as e:
         click.echo(f"Error listing replies: {e}", err=True)
+        raise click.Abort()
+
+
+# ============================================================================
+# Phase 3.5: Bonus Features
+# ============================================================================
+
+
+@main.command()
+@click.option("--count", default=1, type=int, help="Number of IDs to generate (1-1000)")
+@click.option("--space", default="drive", help="Scope: 'drive' or 'appDataFolder'")
+def generate_ids_cmd(count, space):
+    """Pre-generate file IDs for batch operations.
+
+    Useful for batch file creation workflows where you want to reserve
+    IDs before actually creating the files.
+
+    Examples:
+        gwc-drive generate-ids --count 5
+        gwc-drive generate-ids --count 100 --space appDataFolder
+    """
+    try:
+        ids = generate_ids(count=count, space=space)
+        for file_id in ids:
+            click.echo(file_id)
+    except Exception as e:
+        click.echo(f"Error generating IDs: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.option(
+    "--output",
+    type=click.Choice(["unix", "json", "llm"]),
+    default="unix",
+    help="Output format",
+)
+def list_apps_cmd(output):
+    """List installed applications on your Drive.
+
+    Examples:
+        gwc-drive list-apps --output llm
+        gwc-drive list-apps --output json
+    """
+    try:
+        apps = list_apps()
+        click.echo(format_output(apps, output))
+    except Exception as e:
+        click.echo(f"Error listing apps: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("app_id")
+@click.option(
+    "--output",
+    type=click.Choice(["unix", "json", "llm"]),
+    default="unix",
+    help="Output format",
+)
+def get_app_cmd(app_id, output):
+    """Get details about an installed application.
+
+    Examples:
+        gwc-drive get-app app_id --output llm
+    """
+    try:
+        app = get_app(app_id)
+        click.echo(format_output([app], output))
+    except Exception as e:
+        click.echo(f"Error getting app: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("file_id")
+@click.option("--address", help="HTTPS webhook URL for notifications")
+@click.option("--channel-id", help="Unique channel ID (auto-generated if not provided)")
+@click.option("--expiration-ms", type=int, help="Expiration in milliseconds (max 86400000 for 24 hours)")
+@click.option(
+    "--output",
+    type=click.Choice(["unix", "json", "llm"]),
+    default="unix",
+    help="Output format",
+)
+def create_channel_cmd(file_id, address, channel_id, expiration_ms, output):
+    """Create a push notification channel for a file.
+
+    Requires an HTTPS webhook URL. Google Drive will send notifications
+    when the file changes.
+
+    Examples:
+        gwc-drive create-channel file_id --address https://myserver.com/webhook
+        gwc-drive create-channel file_id --address https://myserver.com/webhook --expiration-ms 86400000
+    """
+    try:
+        channel = create_channel(
+            file_id=file_id,
+            channel_address=address,
+            channel_id=channel_id,
+            expiration_ms=expiration_ms,
+        )
+        click.echo(format_output([channel], output))
+    except Exception as e:
+        click.echo(f"Error creating channel: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("channel_id")
+@click.argument("resource_id")
+def stop_channel_cmd(channel_id, resource_id):
+    """Stop receiving notifications on a channel.
+
+    Examples:
+        gwc-drive stop-channel channel_id resource_id
+    """
+    try:
+        message = stop_channel(channel_id, resource_id)
+        click.echo(message)
+    except Exception as e:
+        click.echo(f"Error stopping channel: {e}", err=True)
         raise click.Abort()
 
 

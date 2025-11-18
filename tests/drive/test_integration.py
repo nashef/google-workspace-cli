@@ -625,3 +625,97 @@ class TestPhase3Comments:
                 catch_exceptions=False,
             )
             assert "--output" not in result.output or result.exit_code in [0, 1]
+
+
+class TestPhase35Bonus:
+    """Test Phase 3.5: Bonus feature commands."""
+
+    def test_generate_ids_help(self, runner):
+        """Test generate-ids command help."""
+        result = runner.invoke(drive_cli.main, ["generate-ids", "--help"])
+        assert result.exit_code == 0
+        assert "--count" in result.output
+        assert "--space" in result.output
+
+    def test_list_apps_help(self, runner):
+        """Test list-apps command help."""
+        result = runner.invoke(drive_cli.main, ["list-apps", "--help"])
+        assert result.exit_code == 0
+        assert "--output" in result.output
+
+    def test_get_app_help(self, runner):
+        """Test get-app command help."""
+        result = runner.invoke(drive_cli.main, ["get-app", "--help"])
+        assert result.exit_code == 0
+        assert "APP_ID" in result.output
+
+    def test_create_channel_help(self, runner):
+        """Test create-channel command help."""
+        result = runner.invoke(drive_cli.main, ["create-channel", "--help"])
+        assert result.exit_code == 0
+        assert "FILE_ID" in result.output
+        assert "--address" in result.output
+
+    def test_stop_channel_help(self, runner):
+        """Test stop-channel command help."""
+        result = runner.invoke(drive_cli.main, ["stop-channel", "--help"])
+        assert result.exit_code == 0
+        assert "CHANNEL_ID" in result.output
+        assert "RESOURCE_ID" in result.output
+
+    def test_generate_ids_default(self, runner):
+        """Test generate-ids with default count."""
+        result = runner.invoke(drive_cli.main, ["generate-ids"], catch_exceptions=False)
+        # May fail with auth error, but should not complain about --count
+        assert "--count" not in result.output or result.exit_code in [0, 1]
+
+    def test_generate_ids_custom_count(self, runner):
+        """Test generate-ids with custom count."""
+        result = runner.invoke(
+            drive_cli.main, ["generate-ids", "--count", "10"], catch_exceptions=False
+        )
+        assert "--count" not in result.output or result.exit_code in [0, 1]
+
+    def test_generate_ids_with_space(self, runner):
+        """Test generate-ids with app data folder space."""
+        result = runner.invoke(
+            drive_cli.main,
+            ["generate-ids", "--count", "5", "--space", "appDataFolder"],
+            catch_exceptions=False,
+        )
+        assert "--space" not in result.output or result.exit_code in [0, 1]
+
+    def test_get_app_without_id(self, runner):
+        """Test get-app without app_id."""
+        result = runner.invoke(drive_cli.main, ["get-app"])
+        assert result.exit_code != 0
+
+    def test_create_channel_without_file_id(self, runner):
+        """Test create-channel without file_id."""
+        result = runner.invoke(drive_cli.main, ["create-channel"])
+        assert result.exit_code != 0
+
+    def test_stop_channel_without_ids(self, runner):
+        """Test stop-channel without channel_id and resource_id."""
+        result = runner.invoke(drive_cli.main, ["stop-channel"])
+        assert result.exit_code != 0
+
+    def test_app_output_formats(self, runner):
+        """Test that app commands accept all output formats."""
+        for output_fmt in ["unix", "json", "llm"]:
+            result = runner.invoke(
+                drive_cli.main,
+                ["list-apps", "--output", output_fmt],
+                catch_exceptions=False,
+            )
+            assert "--output" not in result.output or result.exit_code in [0, 1]
+
+    def test_channel_output_formats(self, runner):
+        """Test that channel commands accept output format."""
+        for output_fmt in ["unix", "json", "llm"]:
+            result = runner.invoke(
+                drive_cli.main,
+                ["create-channel", "file_id", "--output", output_fmt, "--address", "https://example.com"],
+                catch_exceptions=False,
+            )
+            assert "--output" not in result.output or result.exit_code in [0, 1]

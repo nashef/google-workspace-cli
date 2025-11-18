@@ -1174,3 +1174,129 @@ def list_replies(file_id: str, comment_id: str) -> List[Dict[str, Any]]:
     ).execute()
 
     return results.get("replies", [])
+
+
+# ============================================================================
+# Phase 3.5: Bonus Features
+# ============================================================================
+
+
+def generate_ids(count: int = 1, space: str = "drive") -> List[str]:
+    """Pre-generate file IDs for batch operations.
+
+    Useful when you want to generate IDs locally before creating files.
+    This reserves the IDs so they won't be reused.
+
+    Args:
+        count: Number of IDs to generate (1-1000)
+        space: Scope for ID generation ('drive' or 'appDataFolder')
+
+    Returns:
+        List of pre-generated file IDs
+    """
+    service = get_drive_service()
+
+    result = service.files().generateIds(
+        count=min(count, 1000),
+        space=space,
+    ).execute()
+
+    return result.get("ids", [])
+
+
+def list_apps() -> List[Dict[str, Any]]:
+    """List installed applications on the user's Drive.
+
+    Returns:
+        List of app dicts with app info
+    """
+    service = get_drive_service()
+
+    results = service.apps().list(
+        fields="apps(id, name, shortDescription, longDescription, icons, hasDriveScope, installed, version, authorization_uri, create_in_folder_template_id)",
+    ).execute()
+
+    return results.get("apps", [])
+
+
+def get_app(app_id: str) -> Dict[str, Any]:
+    """Get details about a specific installed application.
+
+    Args:
+        app_id: Application ID
+
+    Returns:
+        App metadata
+    """
+    service = get_drive_service()
+
+    result = service.apps().get(
+        appId=app_id,
+        fields="id, name, shortDescription, longDescription, icons, hasDriveScope, installed, version",
+    ).execute()
+
+    return result
+
+
+def create_channel(
+    file_id: str,
+    channel_type: str = "web_hook",
+    channel_address: str = None,
+    channel_id: str = None,
+    expiration_ms: int = None,
+) -> Dict[str, Any]:
+    """Create a push notification channel for a file.
+
+    Requires HTTPS webhook URL. Notifications are sent when the file changes.
+
+    Args:
+        file_id: File ID to watch
+        channel_type: Notification type ('web_hook' or 'web_channel')
+        channel_address: HTTPS URL for webhook notifications
+        channel_id: Unique ID for this channel
+        expiration_ms: Milliseconds until channel expires (max 24 hours = 86400000)
+
+    Returns:
+        Channel metadata with ID and expiration
+    """
+    service = get_drive_service()
+
+    body = {
+        "type": channel_type,
+        "id": channel_id or f"channel_{file_id}_{int(__import__('time').time())}",
+    }
+
+    if channel_address:
+        body["address"] = channel_address
+
+    if expiration_ms:
+        body["expiration"] = str(int(__import__('time').time() * 1000 + expiration_ms))
+
+    result = service.files().watch(
+        fileId=file_id,
+        body=body,
+    ).execute()
+
+    return result
+
+
+def stop_channel(channel_id: str, resource_id: str) -> str:
+    """Stop receiving notifications on a channel.
+
+    Args:
+        channel_id: Channel ID (from create_channel response)
+        resource_id: Resource ID (from create_channel response)
+
+    Returns:
+        Confirmation message
+    """
+    service = get_drive_service()
+
+    service.channels().stop(
+        body={
+            "id": channel_id,
+            "resourceId": resource_id,
+        }
+    ).execute()
+
+    return f"Channel {channel_id} stopped"

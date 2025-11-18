@@ -118,6 +118,29 @@ poetry run gwc-drive quota --output llm
 | See replies | `list-replies file_id comment_id --output llm` |
 | Delete comment | `delete-comment file_id comment_id` |
 
+## Batch Operations (Phase 3.5 Bonus)
+
+| Task | Command |
+|------|---------|
+| Generate file ID | `generate-ids` |
+| Generate 10 IDs | `generate-ids --count 10` |
+| Generate app data IDs | `generate-ids --count 5 --space appDataFolder` |
+
+## Webhooks & Notifications (Phase 3.5 Bonus)
+
+| Task | Command |
+|------|---------|
+| Watch file changes | `create-channel file_id --address https://myserver.com/webhook` |
+| Watch with expiry | `create-channel file_id --address https://myserver.com/webhook --expiration-ms 86400000` |
+| Stop watching | `stop-channel channel_id resource_id` |
+
+## Applications (Phase 3.5 Bonus)
+
+| Task | Command |
+|------|---------|
+| List installed apps | `list-apps --output llm` |
+| Get app details | `get-app app_id --output llm` |
+
 ## User Information
 
 | Task | Command |
