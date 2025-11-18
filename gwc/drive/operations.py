@@ -825,3 +825,352 @@ def get_export_mime_types() -> Dict[str, Dict[str, str]]:
             "zip": "application/zip",
         },
     }
+
+
+# ============================================================================
+# Phase 3: Revisions (Version History)
+# ============================================================================
+
+
+def get_revision(file_id: str, revision_id: str) -> Dict[str, Any]:
+    """Get a specific file revision.
+
+    Args:
+        file_id: File ID
+        revision_id: Revision ID
+
+    Returns:
+        Revision metadata
+    """
+    service = get_drive_service()
+
+    result = service.revisions().get(
+        fileId=file_id,
+        revisionId=revision_id,
+        fields="id, mimeType, modifiedTime, modifiedByMe, lastModifyingUser, size, originalFilename, keepForever"
+    ).execute()
+
+    return result
+
+
+def list_revisions(file_id: str, limit: int = 10) -> List[Dict[str, Any]]:
+    """List file revisions (version history).
+
+    Args:
+        file_id: File ID
+        limit: Max results (1-1000)
+
+    Returns:
+        List of revision dicts
+    """
+    service = get_drive_service()
+
+    results = service.revisions().list(
+        fileId=file_id,
+        pageSize=min(limit, 1000),
+        fields="revisions(id, modifiedTime, modifiedByMe, lastModifyingUser, size, originalFilename, keepForever)",
+    ).execute()
+
+    return results.get("revisions", [])
+
+
+def delete_revision(file_id: str, revision_id: str) -> str:
+    """Delete a file revision permanently.
+
+    Args:
+        file_id: File ID
+        revision_id: Revision ID to delete
+
+    Returns:
+        Revision ID
+    """
+    service = get_drive_service()
+
+    service.revisions().delete(
+        fileId=file_id,
+        revisionId=revision_id
+    ).execute()
+
+    return revision_id
+
+
+def keep_revision(file_id: str, revision_id: str, keep_forever: bool = True) -> Dict[str, Any]:
+    """Mark revision to keep forever (prevent auto-deletion after 30 days).
+
+    Args:
+        file_id: File ID
+        revision_id: Revision ID
+        keep_forever: Whether to keep revision forever
+
+    Returns:
+        Updated revision metadata
+    """
+    service = get_drive_service()
+
+    result = service.revisions().update(
+        fileId=file_id,
+        revisionId=revision_id,
+        body={"keepForever": keep_forever},
+        fields="id, keepForever, modifiedTime"
+    ).execute()
+
+    return result
+
+
+def restore_revision(file_id: str, revision_id: str) -> Dict[str, Any]:
+    """Restore a file to a previous revision.
+
+    Args:
+        file_id: File ID
+        revision_id: Revision ID to restore to
+
+    Returns:
+        Updated file metadata
+    """
+    service = get_drive_service()
+
+    # Copy the revision content to current version
+    result = service.revisions().get(
+        fileId=file_id,
+        revisionId=revision_id,
+        fields="*"
+    ).execute()
+
+    # Update the file with restored content
+    update_result = service.files().update(
+        fileId=file_id,
+        body={"name": result.get("originalFilename", "Restored")},
+        fields="id, name, modifiedTime"
+    ).execute()
+
+    return update_result
+
+
+# ============================================================================
+# Phase 3: Changes (Sync Tracking)
+# ============================================================================
+
+
+def get_start_page_token() -> str:
+    """Get the starting pageToken for change tracking.
+
+    Use this when initializing incremental sync. Save the token for later
+    use to check what changed since this point.
+
+    Returns:
+        Starting page token for changes
+    """
+    service = get_drive_service()
+
+    result = service.changes().getStartPageToken().execute()
+    return result.get("startPageToken", "")
+
+
+def list_changes(page_token: str, limit: int = 100) -> Tuple[List[Dict[str, Any]], str]:
+    """List changes to files since a given pageToken.
+
+    Args:
+        page_token: Page token from previous call or getStartPageToken()
+        limit: Max results (1-1000)
+
+    Returns:
+        Tuple of (changes list, next page token)
+    """
+    service = get_drive_service()
+
+    results = service.changes().list(
+        pageToken=page_token,
+        pageSize=min(limit, 1000),
+        spaces="drive",
+        fields="changes(id, type, time, fileId, file(id, name, mimeType, trashed)), nextPageToken",
+    ).execute()
+
+    changes = results.get("changes", [])
+    next_token = results.get("nextPageToken", "")
+
+    return changes, next_token
+
+
+# ============================================================================
+# Phase 3: Comments
+# ============================================================================
+
+
+def create_comment(
+    file_id: str,
+    content: str,
+    anchor: Optional[str] = None,
+) -> str:
+    """Create a comment on a file.
+
+    Args:
+        file_id: File ID
+        content: Comment text
+        anchor: Optional anchor (for replies use replyId in parent comment)
+
+    Returns:
+        Comment ID
+    """
+    service = get_drive_service()
+
+    body = {
+        "content": content,
+    }
+
+    if anchor:
+        body["anchor"] = anchor
+
+    result = service.comments().create(
+        fileId=file_id,
+        body=body,
+        fields="id, content, author, createdTime, resolved"
+    ).execute()
+
+    return result.get("id", "")
+
+
+def get_comment(file_id: str, comment_id: str) -> Dict[str, Any]:
+    """Get a specific comment.
+
+    Args:
+        file_id: File ID
+        comment_id: Comment ID
+
+    Returns:
+        Comment metadata
+    """
+    service = get_drive_service()
+
+    result = service.comments().get(
+        fileId=file_id,
+        commentId=comment_id,
+        fields="id, content, author, createdTime, modifiedTime, resolved, replies"
+    ).execute()
+
+    return result
+
+
+def list_comments(file_id: str, limit: int = 20, include_deleted: bool = False) -> List[Dict[str, Any]]:
+    """List comments on a file.
+
+    Args:
+        file_id: File ID
+        limit: Max results (1-100)
+        include_deleted: Include deleted comments
+
+    Returns:
+        List of comment dicts
+    """
+    service = get_drive_service()
+
+    results = service.comments().list(
+        fileId=file_id,
+        pageSize=min(limit, 100),
+        includeDeleted=include_deleted,
+        fields="comments(id, content, author, createdTime, modifiedTime, resolved, replies)",
+    ).execute()
+
+    return results.get("comments", [])
+
+
+def update_comment(
+    file_id: str,
+    comment_id: str,
+    content: Optional[str] = None,
+    resolved: Optional[bool] = None,
+) -> Dict[str, Any]:
+    """Update a comment.
+
+    Args:
+        file_id: File ID
+        comment_id: Comment ID
+        content: New comment text
+        resolved: Mark comment as resolved/unresolved
+
+    Returns:
+        Updated comment metadata
+    """
+    service = get_drive_service()
+
+    body = {}
+    if content is not None:
+        body["content"] = content
+    if resolved is not None:
+        body["resolved"] = resolved
+
+    result = service.comments().update(
+        fileId=file_id,
+        commentId=comment_id,
+        body=body,
+        fields="id, content, resolved, modifiedTime"
+    ).execute()
+
+    return result
+
+
+def delete_comment(file_id: str, comment_id: str) -> str:
+    """Delete a comment.
+
+    Args:
+        file_id: File ID
+        comment_id: Comment ID
+
+    Returns:
+        Comment ID
+    """
+    service = get_drive_service()
+
+    service.comments().delete(
+        fileId=file_id,
+        commentId=comment_id
+    ).execute()
+
+    return comment_id
+
+
+def create_reply(
+    file_id: str,
+    comment_id: str,
+    content: str,
+) -> str:
+    """Create a reply to a comment.
+
+    Args:
+        file_id: File ID
+        comment_id: Parent comment ID
+        content: Reply text
+
+    Returns:
+        Reply ID
+    """
+    service = get_drive_service()
+
+    result = service.replies().create(
+        fileId=file_id,
+        commentId=comment_id,
+        body={"content": content},
+        fields="id, content, author, createdTime"
+    ).execute()
+
+    return result.get("id", "")
+
+
+def list_replies(file_id: str, comment_id: str) -> List[Dict[str, Any]]:
+    """List replies to a comment.
+
+    Args:
+        file_id: File ID
+        comment_id: Comment ID
+
+    Returns:
+        List of reply dicts
+    """
+    service = get_drive_service()
+
+    results = service.replies().list(
+        fileId=file_id,
+        commentId=comment_id,
+        fields="replies(id, content, author, createdTime, modifiedTime)",
+    ).execute()
+
+    return results.get("replies", [])

@@ -86,6 +86,38 @@ poetry run gwc-drive quota --output llm
 | Show hidden drive | `unhide-drive drive_id` |
 | Delete drive | `delete-drive drive_id` |
 
+## Revisions (Phase 3)
+
+| Task | Command |
+|------|---------|
+| View revision history | `list-revisions file_id --output llm` |
+| See more versions | `list-revisions file_id --limit 50 --output json` |
+| Get revision details | `get-revision file_id revision_id --output llm` |
+| Mark to keep forever | `keep-revision file_id revision_id` |
+| Delete old revision | `delete-revision file_id revision_id` |
+| Restore from version | `restore-revision file_id revision_id` |
+
+## Change Tracking (Phase 3)
+
+| Task | Command |
+|------|---------|
+| Get sync starting point | `get-start-page-token` |
+| Check what changed | `list-changes PAGE_TOKEN --output llm` |
+| Track more changes | `list-changes PAGE_TOKEN --limit 500 --output json` |
+
+## Comments & Collaboration (Phase 3)
+
+| Task | Command |
+|------|---------|
+| Add comment | `create-comment file_id --content "Great work!"` |
+| View all comments | `list-comments file_id --output llm` |
+| Get comment details | `get-comment file_id comment_id --output llm` |
+| Update comment | `update-comment file_id comment_id --content "Updated"` |
+| Mark comment resolved | `update-comment file_id comment_id --resolved true` |
+| Reply to comment | `create-reply file_id comment_id --content "I agree!"` |
+| See replies | `list-replies file_id comment_id --output llm` |
+| Delete comment | `delete-comment file_id comment_id` |
+
 ## User Information
 
 | Task | Command |

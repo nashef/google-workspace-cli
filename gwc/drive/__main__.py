@@ -36,6 +36,20 @@ from gwc.drive.operations import (
     delete_drive,
     hide_drive,
     unhide_drive,
+    get_revision,
+    list_revisions,
+    delete_revision,
+    keep_revision,
+    restore_revision,
+    get_start_page_token,
+    list_changes,
+    create_comment,
+    get_comment,
+    list_comments,
+    update_comment,
+    delete_comment,
+    create_reply,
+    list_replies,
 )
 from gwc.shared.output import format_output, OutputFormat
 
@@ -765,6 +779,342 @@ def unhide_drive_cmd(drive_id, output):
         click.echo(format_output([drive], output))
     except Exception as e:
         click.echo(f"Error unhiding drive: {e}", err=True)
+        raise click.Abort()
+
+
+# ============================================================================
+# Phase 3: Revisions (Version History)
+# ============================================================================
+
+
+@main.command()
+@click.argument("file_id")
+@click.argument("revision_id")
+@click.option(
+    "--output",
+    type=click.Choice(["unix", "json", "llm"]),
+    default="unix",
+    help="Output format",
+)
+def get_revision_cmd(file_id, revision_id, output):
+    """Get a specific file revision.
+
+    Examples:
+        gwc-drive get-revision file_id revision_id --output llm
+    """
+    try:
+        revision = get_revision(file_id, revision_id)
+        click.echo(format_output([revision], output))
+    except Exception as e:
+        click.echo(f"Error getting revision: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("file_id")
+@click.option("--limit", default=10, type=int, help="Max results (1-1000)")
+@click.option(
+    "--output",
+    type=click.Choice(["unix", "json", "llm"]),
+    default="unix",
+    help="Output format",
+)
+def list_revisions_cmd(file_id, limit, output):
+    """List file revisions (version history).
+
+    Examples:
+        gwc-drive list-revisions file_id --output llm
+        gwc-drive list-revisions file_id --limit 50 --output json
+    """
+    try:
+        revisions = list_revisions(file_id, limit=limit)
+        click.echo(format_output(revisions, output))
+    except Exception as e:
+        click.echo(f"Error listing revisions: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("file_id")
+@click.argument("revision_id")
+def delete_revision_cmd(file_id, revision_id):
+    """Delete a file revision permanently.
+
+    Examples:
+        gwc-drive delete-revision file_id revision_id
+    """
+    try:
+        result_id = delete_revision(file_id, revision_id)
+        click.echo(f"Revision {result_id} deleted.")
+    except Exception as e:
+        click.echo(f"Error deleting revision: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("file_id")
+@click.argument("revision_id")
+@click.option("--forever/--not-forever", default=True, help="Keep revision forever")
+@click.option(
+    "--output",
+    type=click.Choice(["unix", "json", "llm"]),
+    default="unix",
+    help="Output format",
+)
+def keep_revision_cmd(file_id, revision_id, forever, output):
+    """Mark revision to keep forever (prevent auto-deletion after 30 days).
+
+    Examples:
+        gwc-drive keep-revision file_id revision_id
+        gwc-drive keep-revision file_id revision_id --not-forever
+    """
+    try:
+        revision = keep_revision(file_id, revision_id, keep_forever=forever)
+        click.echo(format_output([revision], output))
+    except Exception as e:
+        click.echo(f"Error keeping revision: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("file_id")
+@click.argument("revision_id")
+@click.option(
+    "--output",
+    type=click.Choice(["unix", "json", "llm"]),
+    default="unix",
+    help="Output format",
+)
+def restore_revision_cmd(file_id, revision_id, output):
+    """Restore a file to a previous revision.
+
+    Examples:
+        gwc-drive restore-revision file_id revision_id --output llm
+    """
+    try:
+        result = restore_revision(file_id, revision_id)
+        click.echo(format_output([result], output))
+    except Exception as e:
+        click.echo(f"Error restoring revision: {e}", err=True)
+        raise click.Abort()
+
+
+# ============================================================================
+# Phase 3: Changes (Sync Tracking)
+# ============================================================================
+
+
+@main.command()
+def get_start_page_token_cmd():
+    """Get starting pageToken for change tracking.
+
+    Save this token and use it with list-changes to track modifications
+    since this point. Useful for incremental sync.
+
+    Examples:
+        gwc-drive get-start-page-token
+    """
+    try:
+        token = get_start_page_token()
+        click.echo(token)
+    except Exception as e:
+        click.echo(f"Error getting start page token: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("page_token")
+@click.option("--limit", default=100, type=int, help="Max results (1-1000)")
+@click.option(
+    "--output",
+    type=click.Choice(["unix", "json", "llm"]),
+    default="unix",
+    help="Output format",
+)
+def list_changes_cmd(page_token, limit, output):
+    """List changes to files since a given pageToken.
+
+    Use get-start-page-token to get initial token, then use this command
+    to find what changed since that point.
+
+    Examples:
+        gwc-drive list-changes PAGE_TOKEN --output llm
+        gwc-drive list-changes PAGE_TOKEN --limit 50 --output json
+    """
+    try:
+        changes, next_token = list_changes(page_token, limit=limit)
+        result = {"changes": changes, "nextPageToken": next_token}
+        click.echo(format_output([result], output))
+    except Exception as e:
+        click.echo(f"Error listing changes: {e}", err=True)
+        raise click.Abort()
+
+
+# ============================================================================
+# Phase 3: Comments
+# ============================================================================
+
+
+@main.command()
+@click.argument("file_id")
+@click.option("--content", required=True, help="Comment text")
+@click.option(
+    "--output",
+    type=click.Choice(["unix", "json", "llm"]),
+    default="unix",
+    help="Output format",
+)
+def create_comment_cmd(file_id, content, output):
+    """Create a comment on a file.
+
+    Examples:
+        gwc-drive create-comment file_id --content "Great work!"
+    """
+    try:
+        comment_id = create_comment(file_id, content)
+        result = {"id": comment_id, "content": content}
+        click.echo(format_output([result], output))
+    except Exception as e:
+        click.echo(f"Error creating comment: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("file_id")
+@click.argument("comment_id")
+@click.option(
+    "--output",
+    type=click.Choice(["unix", "json", "llm"]),
+    default="unix",
+    help="Output format",
+)
+def get_comment_cmd(file_id, comment_id, output):
+    """Get a specific comment.
+
+    Examples:
+        gwc-drive get-comment file_id comment_id --output llm
+    """
+    try:
+        comment = get_comment(file_id, comment_id)
+        click.echo(format_output([comment], output))
+    except Exception as e:
+        click.echo(f"Error getting comment: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("file_id")
+@click.option("--limit", default=20, type=int, help="Max results (1-100)")
+@click.option("--include-deleted/--no-include-deleted", default=False, help="Include deleted comments")
+@click.option(
+    "--output",
+    type=click.Choice(["unix", "json", "llm"]),
+    default="unix",
+    help="Output format",
+)
+def list_comments_cmd(file_id, limit, include_deleted, output):
+    """List comments on a file.
+
+    Examples:
+        gwc-drive list-comments file_id --output llm
+        gwc-drive list-comments file_id --limit 50 --output json
+    """
+    try:
+        comments = list_comments(file_id, limit=limit, include_deleted=include_deleted)
+        click.echo(format_output(comments, output))
+    except Exception as e:
+        click.echo(f"Error listing comments: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("file_id")
+@click.argument("comment_id")
+@click.option("--content", help="New comment text")
+@click.option("--resolved", type=bool, help="Mark as resolved/unresolved")
+@click.option(
+    "--output",
+    type=click.Choice(["unix", "json", "llm"]),
+    default="unix",
+    help="Output format",
+)
+def update_comment_cmd(file_id, comment_id, content, resolved, output):
+    """Update a comment.
+
+    Examples:
+        gwc-drive update-comment file_id comment_id --content "Updated text"
+        gwc-drive update-comment file_id comment_id --resolved true
+    """
+    try:
+        comment = update_comment(file_id, comment_id, content=content, resolved=resolved)
+        click.echo(format_output([comment], output))
+    except Exception as e:
+        click.echo(f"Error updating comment: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("file_id")
+@click.argument("comment_id")
+def delete_comment_cmd(file_id, comment_id):
+    """Delete a comment.
+
+    Examples:
+        gwc-drive delete-comment file_id comment_id
+    """
+    try:
+        result_id = delete_comment(file_id, comment_id)
+        click.echo(f"Comment {result_id} deleted.")
+    except Exception as e:
+        click.echo(f"Error deleting comment: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("file_id")
+@click.argument("comment_id")
+@click.option("--content", required=True, help="Reply text")
+@click.option(
+    "--output",
+    type=click.Choice(["unix", "json", "llm"]),
+    default="unix",
+    help="Output format",
+)
+def create_reply_cmd(file_id, comment_id, content, output):
+    """Create a reply to a comment.
+
+    Examples:
+        gwc-drive create-reply file_id comment_id --content "I agree!"
+    """
+    try:
+        reply_id = create_reply(file_id, comment_id, content)
+        result = {"id": reply_id, "content": content}
+        click.echo(format_output([result], output))
+    except Exception as e:
+        click.echo(f"Error creating reply: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("file_id")
+@click.argument("comment_id")
+@click.option(
+    "--output",
+    type=click.Choice(["unix", "json", "llm"]),
+    default="unix",
+    help="Output format",
+)
+def list_replies_cmd(file_id, comment_id, output):
+    """List replies to a comment.
+
+    Examples:
+        gwc-drive list-replies file_id comment_id --output llm
+    """
+    try:
+        replies = list_replies(file_id, comment_id)
+        click.echo(format_output(replies, output))
+    except Exception as e:
+        click.echo(f"Error listing replies: {e}", err=True)
         raise click.Abort()
 
 

@@ -421,3 +421,207 @@ class TestPhase2Drives:
                 catch_exceptions=False,
             )
             assert "--output" not in result.output or result.exit_code in [0, 1]
+
+
+class TestPhase3Revisions:
+    """Test Phase 3: Revision commands."""
+
+    def test_get_revision_help(self, runner):
+        """Test get-revision command help."""
+        result = runner.invoke(drive_cli.main, ["get-revision", "--help"])
+        assert result.exit_code == 0
+        assert "FILE_ID" in result.output
+        assert "REVISION_ID" in result.output
+
+    def test_list_revisions_help(self, runner):
+        """Test list-revisions command help."""
+        result = runner.invoke(drive_cli.main, ["list-revisions", "--help"])
+        assert result.exit_code == 0
+        assert "FILE_ID" in result.output
+        assert "--limit" in result.output
+
+    def test_delete_revision_help(self, runner):
+        """Test delete-revision command help."""
+        result = runner.invoke(drive_cli.main, ["delete-revision", "--help"])
+        assert result.exit_code == 0
+        assert "FILE_ID" in result.output
+        assert "REVISION_ID" in result.output
+
+    def test_keep_revision_help(self, runner):
+        """Test keep-revision command help."""
+        result = runner.invoke(drive_cli.main, ["keep-revision", "--help"])
+        assert result.exit_code == 0
+        assert "FILE_ID" in result.output
+        assert "REVISION_ID" in result.output
+
+    def test_restore_revision_help(self, runner):
+        """Test restore-revision command help."""
+        result = runner.invoke(drive_cli.main, ["restore-revision", "--help"])
+        assert result.exit_code == 0
+        assert "FILE_ID" in result.output
+        assert "REVISION_ID" in result.output
+
+    def test_get_revision_without_ids(self, runner):
+        """Test get-revision without file_id and revision_id."""
+        result = runner.invoke(drive_cli.main, ["get-revision"])
+        assert result.exit_code != 0
+
+    def test_list_revisions_without_file_id(self, runner):
+        """Test list-revisions without file_id."""
+        result = runner.invoke(drive_cli.main, ["list-revisions"])
+        assert result.exit_code != 0
+
+    def test_delete_revision_without_ids(self, runner):
+        """Test delete-revision without ids."""
+        result = runner.invoke(drive_cli.main, ["delete-revision"])
+        assert result.exit_code != 0
+
+    def test_keep_revision_without_ids(self, runner):
+        """Test keep-revision without ids."""
+        result = runner.invoke(drive_cli.main, ["keep-revision"])
+        assert result.exit_code != 0
+
+    def test_restore_revision_without_ids(self, runner):
+        """Test restore-revision without ids."""
+        result = runner.invoke(drive_cli.main, ["restore-revision"])
+        assert result.exit_code != 0
+
+    def test_revision_output_formats(self, runner):
+        """Test that revision commands accept all output formats."""
+        for output_fmt in ["unix", "json", "llm"]:
+            result = runner.invoke(
+                drive_cli.main,
+                ["list-revisions", "test_id", "--output", output_fmt],
+                catch_exceptions=False,
+            )
+            assert "--output" not in result.output or result.exit_code in [0, 1]
+
+
+class TestPhase3Changes:
+    """Test Phase 3: Change tracking commands."""
+
+    def test_get_start_page_token_help(self, runner):
+        """Test get-start-page-token command help."""
+        result = runner.invoke(drive_cli.main, ["get-start-page-token", "--help"])
+        assert result.exit_code == 0
+
+    def test_list_changes_help(self, runner):
+        """Test list-changes command help."""
+        result = runner.invoke(drive_cli.main, ["list-changes", "--help"])
+        assert result.exit_code == 0
+        assert "PAGE_TOKEN" in result.output
+        assert "--limit" in result.output
+
+    def test_list_changes_without_token(self, runner):
+        """Test list-changes without page_token."""
+        result = runner.invoke(drive_cli.main, ["list-changes"])
+        assert result.exit_code != 0
+
+    def test_list_changes_output_formats(self, runner):
+        """Test that list-changes accepts all output formats."""
+        for output_fmt in ["unix", "json", "llm"]:
+            result = runner.invoke(
+                drive_cli.main,
+                ["list-changes", "test_token", "--output", output_fmt],
+                catch_exceptions=False,
+            )
+            assert "--output" not in result.output or result.exit_code in [0, 1]
+
+
+class TestPhase3Comments:
+    """Test Phase 3: Comment commands."""
+
+    def test_create_comment_help(self, runner):
+        """Test create-comment command help."""
+        result = runner.invoke(drive_cli.main, ["create-comment", "--help"])
+        assert result.exit_code == 0
+        assert "FILE_ID" in result.output
+        assert "--content" in result.output
+
+    def test_get_comment_help(self, runner):
+        """Test get-comment command help."""
+        result = runner.invoke(drive_cli.main, ["get-comment", "--help"])
+        assert result.exit_code == 0
+        assert "FILE_ID" in result.output
+        assert "COMMENT_ID" in result.output
+
+    def test_list_comments_help(self, runner):
+        """Test list-comments command help."""
+        result = runner.invoke(drive_cli.main, ["list-comments", "--help"])
+        assert result.exit_code == 0
+        assert "FILE_ID" in result.output
+        assert "--limit" in result.output
+
+    def test_update_comment_help(self, runner):
+        """Test update-comment command help."""
+        result = runner.invoke(drive_cli.main, ["update-comment", "--help"])
+        assert result.exit_code == 0
+        assert "FILE_ID" in result.output
+        assert "COMMENT_ID" in result.output
+
+    def test_delete_comment_help(self, runner):
+        """Test delete-comment command help."""
+        result = runner.invoke(drive_cli.main, ["delete-comment", "--help"])
+        assert result.exit_code == 0
+        assert "FILE_ID" in result.output
+        assert "COMMENT_ID" in result.output
+
+    def test_create_reply_help(self, runner):
+        """Test create-reply command help."""
+        result = runner.invoke(drive_cli.main, ["create-reply", "--help"])
+        assert result.exit_code == 0
+        assert "FILE_ID" in result.output
+        assert "COMMENT_ID" in result.output
+        assert "--content" in result.output
+
+    def test_list_replies_help(self, runner):
+        """Test list-replies command help."""
+        result = runner.invoke(drive_cli.main, ["list-replies", "--help"])
+        assert result.exit_code == 0
+        assert "FILE_ID" in result.output
+        assert "COMMENT_ID" in result.output
+
+    def test_create_comment_without_content(self, runner):
+        """Test create-comment without --content option."""
+        result = runner.invoke(drive_cli.main, ["create-comment", "file_id"])
+        assert result.exit_code != 0
+
+    def test_get_comment_without_ids(self, runner):
+        """Test get-comment without file_id and comment_id."""
+        result = runner.invoke(drive_cli.main, ["get-comment"])
+        assert result.exit_code != 0
+
+    def test_list_comments_without_file_id(self, runner):
+        """Test list-comments without file_id."""
+        result = runner.invoke(drive_cli.main, ["list-comments"])
+        assert result.exit_code != 0
+
+    def test_update_comment_without_ids(self, runner):
+        """Test update-comment without file_id and comment_id."""
+        result = runner.invoke(drive_cli.main, ["update-comment"])
+        assert result.exit_code != 0
+
+    def test_delete_comment_without_ids(self, runner):
+        """Test delete-comment without file_id and comment_id."""
+        result = runner.invoke(drive_cli.main, ["delete-comment"])
+        assert result.exit_code != 0
+
+    def test_create_reply_without_content(self, runner):
+        """Test create-reply without --content option."""
+        result = runner.invoke(drive_cli.main, ["create-reply", "file_id", "comment_id"])
+        assert result.exit_code != 0
+
+    def test_list_replies_without_ids(self, runner):
+        """Test list-replies without file_id and comment_id."""
+        result = runner.invoke(drive_cli.main, ["list-replies"])
+        assert result.exit_code != 0
+
+    def test_comment_output_formats(self, runner):
+        """Test that comment commands accept all output formats."""
+        for output_fmt in ["unix", "json", "llm"]:
+            result = runner.invoke(
+                drive_cli.main,
+                ["list-comments", "test_id", "--output", output_fmt],
+                catch_exceptions=False,
+            )
+            assert "--output" not in result.output or result.exit_code in [0, 1]
