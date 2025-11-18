@@ -223,6 +223,106 @@ def get_event(event_id: str, calendar_id: str = "primary") -> Dict[str, Any]:
         raise APIError(f"Failed to get event '{event_id}': {e}")
 
 
+def add_attendees(
+    event_id: str,
+    attendee_emails: List[str],
+    calendar_id: str = "primary",
+    send_updates: Optional[str] = None
+) -> Dict[str, Any]:
+    """Add attendees to an existing event.
+
+    Args:
+        event_id: Event ID
+        attendee_emails: List of email addresses to add
+        calendar_id: Calendar ID (default "primary")
+        send_updates: "all", "externalOnly", or "none" - notify existing guests
+
+    Returns:
+        Updated event object
+    """
+    # Get existing event
+    event = get_event(event_id, calendar_id)
+
+    # Get existing attendees
+    existing_emails = set()
+    if 'attendees' in event:
+        existing_emails = {att['email'] for att in event['attendees']}
+
+    # Add new attendees (avoiding duplicates)
+    new_emails = set(att.strip() for att in attendee_emails)
+    all_emails = existing_emails | new_emails
+
+    # Update event with full attendee list
+    service = build_calendar_service()
+    event['attendees'] = [{'email': email} for email in sorted(all_emails)]
+
+    try:
+        kwargs = {
+            'calendarId': calendar_id,
+            'eventId': event_id,
+            'body': event
+        }
+        if send_updates:
+            kwargs['sendUpdates'] = send_updates
+
+        result = service.events().patch(**kwargs).execute()
+        return result
+    except HttpError as e:
+        raise APIError(f"Failed to add attendees: {e}")
+
+
+def remove_attendees(
+    event_id: str,
+    attendee_emails: List[str],
+    calendar_id: str = "primary",
+    send_updates: Optional[str] = None
+) -> Dict[str, Any]:
+    """Remove attendees from an existing event.
+
+    Args:
+        event_id: Event ID
+        attendee_emails: List of email addresses to remove
+        calendar_id: Calendar ID (default "primary")
+        send_updates: "all", "externalOnly", or "none" - notify remaining guests
+
+    Returns:
+        Updated event object
+    """
+    # Get existing event
+    event = get_event(event_id, calendar_id)
+
+    # Get existing attendees
+    if 'attendees' not in event:
+        raise APIError("Event has no attendees to remove")
+
+    existing_emails = {att['email'] for att in event['attendees']}
+
+    # Remove specified attendees
+    remove_set = set(att.strip() for att in attendee_emails)
+    remaining_emails = existing_emails - remove_set
+
+    if not remaining_emails:
+        raise ValidationError("Cannot remove all attendees from event")
+
+    # Update event with filtered attendee list
+    service = build_calendar_service()
+    event['attendees'] = [{'email': email} for email in sorted(remaining_emails)]
+
+    try:
+        kwargs = {
+            'calendarId': calendar_id,
+            'eventId': event_id,
+            'body': event
+        }
+        if send_updates:
+            kwargs['sendUpdates'] = send_updates
+
+        result = service.events().patch(**kwargs).execute()
+        return result
+    except HttpError as e:
+        raise APIError(f"Failed to remove attendees: {e}")
+
+
 def update_event(
     event_id: str,
     subject: Optional[str] = None,

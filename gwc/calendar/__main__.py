@@ -355,6 +355,16 @@ def get(event_id, calendar, output):
     help='Notify guests when updating event'
 )
 @click.option(
+    '--add-attendee',
+    multiple=True,
+    help='Add an attendee (can be used multiple times)'
+)
+@click.option(
+    '--remove-attendee',
+    multiple=True,
+    help='Remove an attendee (can be used multiple times)'
+)
+@click.option(
     '--calendar',
     default='primary',
     help='Calendar ID (default: primary)'
@@ -365,7 +375,7 @@ def get(event_id, calendar, output):
     default='unix',
     help='Output format (default: unix)'
 )
-def update(event_id, time, subject, duration, attendees, description, meet, location, transparency, visibility, description_file, notify, calendar, output):
+def update(event_id, time, subject, duration, attendees, description, meet, location, transparency, visibility, description_file, notify, add_attendee, remove_attendee, calendar, output):
     """Update a calendar event.
 
     Only specified fields are updated.
@@ -373,10 +383,32 @@ def update(event_id, time, subject, duration, attendees, description, meet, loca
     Examples:
         gwc-cal update abc123def456 --subject "New Title"
         gwc-cal update abc123def456 --meet --notify all
-        gwc-cal update abc123def456 --location "Room 101" --notify externalOnly
+        gwc-cal update abc123def456 --add-attendee alice@company.com --add-attendee bob@company.com
+        gwc-cal update abc123def456 --remove-attendee charlie@company.com --notify all
     """
     try:
-        # Parse attendees
+        # Handle add/remove attendees separately (they modify the event)
+        if add_attendee:
+            event = operations.add_attendees(
+                event_id=event_id,
+                attendee_emails=list(add_attendee),
+                calendar_id=calendar,
+                send_updates=notify
+            )
+            click.echo(f"Added {len(add_attendee)} attendee(s).")
+            return
+
+        if remove_attendee:
+            event = operations.remove_attendees(
+                event_id=event_id,
+                attendee_emails=list(remove_attendee),
+                calendar_id=calendar,
+                send_updates=notify
+            )
+            click.echo(f"Removed {len(remove_attendee)} attendee(s).")
+            return
+
+        # Parse attendees for full replacement
         attendee_list = None
         if attendees:
             attendee_list = [a.strip() for a in attendees.split(',')]
