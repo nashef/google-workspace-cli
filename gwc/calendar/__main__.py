@@ -5,7 +5,6 @@ import click
 
 from ..shared.exceptions import GwcError, AuthenticationError, ValidationError, ConfigError
 from ..shared.output import OutputFormat, format_output
-from ..shared.auth import authenticate_interactive, refresh_token
 from ..shared import config as config_module
 from . import operations
 
@@ -15,31 +14,6 @@ from . import operations
 def main():
     """Google Calendar CLI - Manage Google Calendar from the command line."""
     pass
-
-
-@main.command()
-@click.option(
-    '--refresh',
-    is_flag=True,
-    help='Refresh an existing token instead of performing initial authentication.'
-)
-def auth(refresh):
-    """Authenticate with Google Workspace.
-
-    Without --refresh: Performs initial OAuth2 setup. Prints authorization URL
-    and guides you through the authentication flow.
-
-    With --refresh: Refreshes an existing token.
-    """
-    try:
-        if refresh:
-            refresh_token()
-        else:
-            authenticate_interactive()
-            click.echo("Authentication successful! Token saved.")
-    except GwcError as e:
-        click.echo(f"Error: {e}", err=True)
-        sys.exit(1)
 
 
 @main.group()
