@@ -3,9 +3,10 @@
 import sys
 import click
 
-from ..shared.exceptions import GwcError, AuthenticationError, ValidationError
+from ..shared.exceptions import GwcError, AuthenticationError, ValidationError, ConfigError
 from ..shared.output import OutputFormat, format_output
 from ..shared.auth import authenticate_interactive, refresh_token
+from ..shared import config as config_module
 from . import operations
 
 
@@ -36,6 +37,84 @@ def auth(refresh):
         else:
             authenticate_interactive()
             click.echo("Authentication successful! Token saved.")
+    except GwcError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@main.group()
+def config():
+    """Manage configuration settings.
+
+    Store and retrieve configuration like default calendar, timezone, etc.
+    """
+    pass
+
+
+@config.command('set')
+@click.argument('key')
+@click.argument('value')
+def config_set(key, value):
+    """Set a configuration value.
+
+    Examples:
+        gwc-cal config set default-calendar primary
+        gwc-cal config set default-calendar "Foster family parenting plan"
+    """
+    try:
+        config_module.set_config_value(key, value)
+        click.echo(f"Set {key} = {value}")
+    except GwcError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@config.command('get')
+@click.argument('key')
+def config_get(key):
+    """Get a configuration value.
+
+    Example:
+        gwc-cal config get default-calendar
+    """
+    try:
+        value = config_module.get_config_value(key)
+        if value is None:
+            click.echo(f"Configuration key '{key}' not set.")
+        else:
+            click.echo(value)
+    except GwcError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@config.command('list')
+def config_list():
+    """List all configuration values."""
+    try:
+        all_config = config_module.load_config()
+        if not all_config:
+            click.echo("No configuration set.")
+            return
+
+        for key, value in sorted(all_config.items()):
+            click.echo(f"{key} = {value}")
+    except GwcError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@config.command('delete')
+@click.argument('key')
+def config_delete(key):
+    """Delete a configuration value.
+
+    Example:
+        gwc-cal config delete default-calendar
+    """
+    try:
+        config_module.delete_config_value(key)
+        click.echo(f"Deleted {key}")
     except GwcError as e:
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)

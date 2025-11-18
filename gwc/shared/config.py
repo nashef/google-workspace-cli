@@ -94,19 +94,78 @@ def save_token(token: Dict[str, Any]) -> None:
         raise ConfigError(f"Failed to save token: {e}")
 
 
+def load_config() -> Dict[str, Any]:
+    """Load all configuration values.
+
+    Returns:
+        Dictionary of config values, or empty dict if config file doesn't exist.
+    """
+    if not CONFIG_FILE.exists():
+        return {}
+
+    try:
+        with open(CONFIG_FILE, 'r') as f:
+            return json.load(f)
+    except (json.JSONDecodeError, IOError) as e:
+        raise ConfigError(f"Failed to load config: {e}")
+
+
+def save_config(config: Dict[str, Any]) -> None:
+    """Save configuration values to file."""
+    ensure_config_dir()
+
+    try:
+        with open(CONFIG_FILE, 'w') as f:
+            json.dump(config, f, indent=2)
+        os.chmod(CONFIG_FILE, 0o600)
+    except IOError as e:
+        raise ConfigError(f"Failed to save config: {e}")
+
+
 def get_config_value(key: str, default: Optional[Any] = None) -> Optional[Any]:
     """Get a configuration value.
 
-    For now, this is a placeholder. In the future, we'll load from config.toml.
+    Args:
+        key: Configuration key
+        default: Default value if key doesn't exist
+
+    Returns:
+        Configuration value or default
     """
-    # TODO: Implement config.toml parsing
-    return default
+    try:
+        config = load_config()
+        return config.get(key, default)
+    except ConfigError:
+        return default
 
 
 def set_config_value(key: str, value: Any) -> None:
     """Set a configuration value.
 
-    For now, this is a placeholder. In the future, we'll save to config.toml.
+    Args:
+        key: Configuration key
+        value: Value to set
     """
-    # TODO: Implement config.toml writing
-    pass
+    try:
+        config = load_config()
+    except ConfigError:
+        config = {}
+
+    config[key] = value
+    save_config(config)
+
+
+def delete_config_value(key: str) -> None:
+    """Delete a configuration value.
+
+    Args:
+        key: Configuration key to delete
+    """
+    try:
+        config = load_config()
+    except ConfigError:
+        config = {}
+
+    if key in config:
+        del config[key]
+        save_config(config)
