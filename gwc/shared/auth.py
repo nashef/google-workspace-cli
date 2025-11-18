@@ -31,8 +31,14 @@ PEOPLE_SCOPES = [
     "https://www.googleapis.com/auth/contacts.readonly"
 ]
 
+# Google Drive API scopes
+DRIVE_SCOPES = [
+    "https://www.googleapis.com/auth/drive",
+    "https://www.googleapis.com/auth/drive.file",
+]
+
 # Union of all scopes we might need
-ALL_SCOPES = list(set(CALENDAR_SCOPES + GMAIL_SCOPES + PEOPLE_SCOPES))
+ALL_SCOPES = list(set(CALENDAR_SCOPES + GMAIL_SCOPES + PEOPLE_SCOPES + DRIVE_SCOPES))
 
 
 def authenticate_interactive(scopes: Optional[list] = None) -> Credentials:
