@@ -1,3 +1,16 @@
+# Apologia
+
+This is completely vibe-coded and highly experimental, but it seems to basically work, and appears to be very useful.
+
+
+Nota Bene: *Think very carefully about your access rules.* These tools try to cover the entire REST API for each of the supported services, which means that they could do extensive damage if your LLM got prompt injected. E.g., by reading a Phishing email that contains a hidden subversive prompt for your AI. One that, for example, causes your own agent to replace your company name with an expletive in every Sheets doc in your entire Google Drive.
+
+I am warning you now to think very carefully about how you use these tools.
+
+That said, I included Claude Skills for all of the tools.
+
+If you try it out, after all that, have your LLM write bug reports. Send them to me. I will fix them.
+
 # google-workspace-cli
 
 A command line toolkit for interacting with Google Workspace APIs (Calendar, Gmail, Drive, People, Docs, Sheets, Slides). Designed for simplicity and LLM integration.
@@ -12,11 +25,20 @@ A command line toolkit for interacting with Google Workspace APIs (Calendar, Gma
    ```
 
 2. **Authenticate** (one time):
+
+    Before you authenticate, you must [create credentials in the Google Cloud console](https://developers.google.com/workspace/guides/create-credentials) for a desktop app client. Once you have downloaded the credentials.json and place it here: `~/.config/credential.json`. You can then run the auth flow.
+
    ```bash
-   poetry run gwc-cal auth
+   poetry run gwc auth
    ```
 
-   This will print an authorization URL. Visit it in your browser, approve access, and paste the authorization code back when prompted. Your credentials will be saved to `~/.config/gwc/token.json`.
+   This will print an authorization URL to your terminal. You must visit this in a browser tab logged into the same account or organization you used to create the credentials above. The URL will take you through the OAuth authorization flow. If the `gwc auth` command is running on the same machine as the browser, then the browser should automatically complete the OAuth flow. If you are running this on a server, your browser may try to visit localhost on a weird port, and get an error. That's ok, just copy that URL over to the server where `gwc auth` is running and curl it. Make sure to put the URL in single quotes as shown:
+
+   ```bash
+   curl '<ENTIRE_LONG_URL>'
+   ```
+
+   Your oauth token will be saved to `~/.config/gwc/token.json`. It can be refreshed using `gwc auth --refresh` without having to complete the login flow again.
 
 ### Basic Usage
 
@@ -123,9 +145,3 @@ poetry run gwc-cal auth --refresh
 - `update` - Update an event
 - `delete` - Delete an event
 - `find` - Search/filter events
-
-## Resources
-
-- [Google Calendar API v3 Reference](https://developers.google.com/workspace/calendar/api/v3/reference)
-- [Google Calendar API Python Client Library](https://developers.google.com/resources/api-libraries/documentation/calendar/v3/python/latest/)
-- [Google Calendar API Python Quickstart](https://developers.google.com/workspace/calendar/api/quickstart/python)
