@@ -93,6 +93,7 @@ def create_event(
     duration_minutes: int = 60,
     description: Optional[str] = None,
     attendees: Optional[List[str]] = None,
+    add_meet: bool = False,
     calendar_id: str = "primary"
 ) -> Dict[str, Any]:
     """Create a calendar event.
@@ -103,6 +104,7 @@ def create_event(
         duration_minutes: Duration in minutes (default 60)
         description: Event description
         attendees: List of attendee email addresses
+        add_meet: Whether to add a Google Meet conference (default False)
         calendar_id: Calendar ID (default "primary")
 
     Returns:
@@ -150,13 +152,24 @@ def create_event(
     if attendees:
         event['attendees'] = [{'email': email.strip()} for email in attendees]
 
+    if add_meet:
+        event['conferenceData'] = {
+            'createRequest': {
+                'requestId': 'gwc-' + event['start']['dateTime'],
+                'conferenceSolutionKey': {
+                    'type': 'hangoutsMeet'
+                }
+            }
+        }
+
     # Create event
     service = build_calendar_service()
 
     try:
         result = service.events().insert(
             calendarId=calendar_id,
-            body=event
+            body=event,
+            conferenceDataVersion=1 if add_meet else 0
         ).execute()
         return result
     except HttpError as e:
@@ -192,6 +205,7 @@ def update_event(
     duration_minutes: Optional[int] = None,
     description: Optional[str] = None,
     attendees: Optional[List[str]] = None,
+    add_meet: bool = False,
     calendar_id: str = "primary"
 ) -> Dict[str, Any]:
     """Update a calendar event.
@@ -203,6 +217,7 @@ def update_event(
         duration_minutes: New duration in minutes
         description: New description
         attendees: New attendee list
+        add_meet: Whether to add a Google Meet conference
         calendar_id: Calendar ID (default "primary")
 
     Returns:
@@ -245,12 +260,23 @@ def update_event(
     if attendees is not None:
         event['attendees'] = [{'email': email.strip()} for email in attendees]
 
+    if add_meet:
+        event['conferenceData'] = {
+            'createRequest': {
+                'requestId': 'gwc-' + event_id,
+                'conferenceSolutionKey': {
+                    'type': 'hangoutsMeet'
+                }
+            }
+        }
+
     # Perform update
     try:
         result = service.events().patch(
             calendarId=calendar_id,
             eventId=event_id,
-            body=event
+            body=event,
+            conferenceDataVersion=1 if add_meet else 0
         ).execute()
         return result
     except HttpError as e:

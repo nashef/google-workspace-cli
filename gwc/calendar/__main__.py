@@ -185,6 +185,11 @@ def list(output):
     help='Event description'
 )
 @click.option(
+    '--meet',
+    is_flag=True,
+    help='Add a Google Meet conference to the event'
+)
+@click.option(
     '--calendar',
     default='primary',
     help='Calendar ID (default: primary)'
@@ -195,11 +200,12 @@ def list(output):
     default='unix',
     help='Output format (default: unix)'
 )
-def create(time, subject, duration, attendees, description, calendar, output):
+def create(time, subject, duration, attendees, description, meet, calendar, output):
     """Create a new calendar event.
 
-    Example:
+    Examples:
         gwc-cal create --time 2025-01-15T14:00:00 --subject "Team Meeting"
+        gwc-cal create --time 2025-01-15T14:00:00 --subject "Team Meeting" --meet
     """
     try:
         # Parse attendees
@@ -213,6 +219,7 @@ def create(time, subject, duration, attendees, description, calendar, output):
             duration_minutes=duration,
             description=description,
             attendees=attendee_list,
+            add_meet=meet,
             calendar_id=calendar
         )
 
@@ -285,6 +292,11 @@ def get(event_id, calendar, output):
     help='New event description'
 )
 @click.option(
+    '--meet',
+    is_flag=True,
+    help='Add a Google Meet conference to the event'
+)
+@click.option(
     '--calendar',
     default='primary',
     help='Calendar ID (default: primary)'
@@ -295,13 +307,14 @@ def get(event_id, calendar, output):
     default='unix',
     help='Output format (default: unix)'
 )
-def update(event_id, time, subject, duration, attendees, description, calendar, output):
+def update(event_id, time, subject, duration, attendees, description, meet, calendar, output):
     """Update a calendar event.
 
     Only specified fields are updated.
 
-    Example:
+    Examples:
         gwc-cal update abc123def456 --subject "New Title"
+        gwc-cal update abc123def456 --meet
     """
     try:
         # Parse attendees
@@ -316,6 +329,7 @@ def update(event_id, time, subject, duration, attendees, description, calendar, 
             duration_minutes=duration,
             description=description,
             attendees=attendee_list,
+            add_meet=meet,
             calendar_id=calendar
         )
 
