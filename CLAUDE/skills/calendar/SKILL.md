@@ -1,7 +1,16 @@
 ---
 name: calendar
-description: Comprehensive google calendar management.
+description: Comprehensive google calendar management (Phases 1-4 complete).
 ---
+
+## Status
+
+✅ **Phase 1**: Basic event CRUD (create, read, update, delete)
+✅ **Phase 2**: Attendee management (add/remove, notifications)
+✅ **Phase 3**: Reminders and notifications
+✅ **Phase 4**: Recurring events (daily, weekly, monthly, custom patterns)
+
+All core calendar functionality is fully implemented and tested.
 
 ## IMPORTANT: Timezone & Date Handling
 
@@ -42,6 +51,26 @@ poetry run gwc-cal create \
   --attendees "alice@company.com,bob@company.com" \
   --meet \
   --location "Conference Room A"
+```
+
+**Create recurring event (weekly standup):**
+```bash
+poetry run gwc-cal create \
+  --time "2025-01-20T09:00:00-07:00" \
+  --subject "Weekly Standup" \
+  --duration 30 \
+  --attendees "alice@company.com,bob@company.com" \
+  --recurrence "FREQ=WEEKLY;BYDAY=MO,WE,FR;COUNT=12"
+```
+
+**Add reminders to event:**
+```bash
+poetry run gwc-cal create \
+  --time "2025-01-20T14:00:00-07:00" \
+  --subject "Client Call" \
+  --duration 60 \
+  --reminder "15 minutes" \
+  --reminder "1 day"
 ```
 
 **Update an event (remember duration!):**
