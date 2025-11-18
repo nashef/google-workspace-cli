@@ -198,5 +198,153 @@ def list(limit, sort, output):
         sys.exit(1)
 
 
+@main.command()
+@click.option(
+    '--name',
+    help='Contact display name'
+)
+@click.option(
+    '--email',
+    help='Email address'
+)
+@click.option(
+    '--phone',
+    help='Phone number'
+)
+@click.option(
+    '--organization',
+    help='Organization name'
+)
+@click.option(
+    '--address',
+    help='Physical address'
+)
+@click.option(
+    '--output',
+    type=click.Choice(['unix', 'json', 'llm']),
+    default='unix',
+    help='Output format (default: unix)'
+)
+def create(name, email, phone, organization, address, output):
+    """Create a new contact.
+
+    Examples:
+        gwc-people create --name "John Smith" --email "john@example.com"
+        gwc-people create --name "Jane Doe" --phone "+1234567890" --organization "Acme"
+        gwc-people create --email "contact@example.com" --output json
+    """
+    try:
+        contact = operations.create_contact(
+            name=name,
+            email=email,
+            phone=phone,
+            organization=organization,
+            address=address
+        )
+
+        format_type = OutputFormat(output)
+        fields = ['names', 'emailAddresses', 'phoneNumbers', 'organizations', 'resourceName']
+        output_str = format_output(contact, format_type, fields)
+        click.echo(output_str)
+
+    except ValidationError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+    except GwcError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@main.command()
+@click.argument('email_or_id')
+@click.option(
+    '--name',
+    help='New display name'
+)
+@click.option(
+    '--email',
+    help='New email address'
+)
+@click.option(
+    '--phone',
+    help='New phone number'
+)
+@click.option(
+    '--organization',
+    help='New organization name'
+)
+@click.option(
+    '--address',
+    help='New physical address'
+)
+@click.option(
+    '--output',
+    type=click.Choice(['unix', 'json', 'llm']),
+    default='unix',
+    help='Output format (default: unix)'
+)
+def update(email_or_id, name, email, phone, organization, address, output):
+    """Update an existing contact.
+
+    Examples:
+        gwc-people update "john@example.com" --phone "+1987654321"
+        gwc-people update "jane@example.com" --organization "New Company"
+        gwc-people update "people/c123456789" --name "Jonathan Smith" --output json
+    """
+    try:
+        contact = operations.update_contact(
+            resource_name_or_email=email_or_id,
+            name=name,
+            email=email,
+            phone=phone,
+            organization=organization,
+            address=address
+        )
+
+        format_type = OutputFormat(output)
+        fields = ['names', 'emailAddresses', 'phoneNumbers', 'organizations', 'resourceName']
+        output_str = format_output(contact, format_type, fields)
+        click.echo(output_str)
+
+    except ValidationError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+    except GwcError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@main.command()
+@click.argument('email_or_id')
+@click.option(
+    '--confirm',
+    is_flag=True,
+    help='Confirm deletion without prompting'
+)
+def delete(email_or_id, confirm):
+    """Delete a contact.
+
+    Examples:
+        gwc-people delete "john@example.com"
+        gwc-people delete "people/c123456789" --confirm
+    """
+    try:
+        if not confirm:
+            click.echo(f"About to delete contact: {email_or_id}")
+            if not click.confirm("Are you sure?"):
+                click.echo("Deletion cancelled.")
+                return
+
+        operations.delete_contact(email_or_id)
+        click.echo(f"Contact deleted successfully.")
+
+    except ValidationError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+    except GwcError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
 if __name__ == "__main__":
     main()

@@ -207,3 +207,331 @@ def get_contact_name(resource_name_or_email: str) -> str:
             return name.get('displayName')
 
     return names[0].get('displayName')
+
+
+def create_contact(
+    name: Optional[str] = None,
+    email: Optional[str] = None,
+    phone: Optional[str] = None,
+    organization: Optional[str] = None,
+    address: Optional[str] = None
+) -> Dict[str, Any]:
+    """Create a new contact.
+
+    Args:
+        name: Contact display name (at least name or email required)
+        email: Email address
+        phone: Phone number
+        organization: Organization name
+        address: Physical address
+
+    Returns:
+        Created contact object with resourceName
+
+    Raises:
+        ValidationError: If required fields missing or invalid
+        APIError: If API call fails
+    """
+    if not name and not email:
+        raise ValidationError("At least name or email is required to create a contact")
+
+    service = build_people_service()
+
+    # Build contact object
+    contact = {}
+
+    if name:
+        contact['names'] = [{'displayName': name}]
+
+    if email:
+        contact['emailAddresses'] = [{'value': email}]
+
+    if phone:
+        contact['phoneNumbers'] = [{'value': phone}]
+
+    if organization:
+        contact['organizations'] = [{'name': organization}]
+
+    if address:
+        contact['addresses'] = [{'formattedValue': address}]
+
+    try:
+        result = service.people().createContact(body=contact).execute()
+        return result
+    except HttpError as e:
+        if e.resp.status == 409:
+            raise ValidationError(f"Contact with this email already exists")
+        raise APIError(f"Failed to create contact: {e}")
+
+
+def create_contact_batch(contacts: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Create multiple contacts in a batch operation.
+
+    Args:
+        contacts: List of contact dicts (each can have name, email, phone, organization, address)
+
+    Returns:
+        List of created contacts with resourceNames
+
+    Raises:
+        ValidationError: If contacts list is empty or invalid
+        APIError: If API call fails
+    """
+    if not contacts:
+        raise ValidationError("Contacts list cannot be empty")
+
+    if len(contacts) > 1000:
+        raise ValidationError("Maximum 1000 contacts per batch")
+
+    service = build_people_service()
+
+    # Build batch request
+    requests = []
+    for contact_data in contacts:
+        contact = {}
+
+        if contact_data.get('name'):
+            contact['names'] = [{'displayName': contact_data['name']}]
+
+        if contact_data.get('email'):
+            contact['emailAddresses'] = [{'value': contact_data['email']}]
+
+        if contact_data.get('phone'):
+            contact['phoneNumbers'] = [{'value': contact_data['phone']}]
+
+        if contact_data.get('organization'):
+            contact['organizations'] = [{'name': contact_data['organization']}]
+
+        if contact_data.get('address'):
+            contact['addresses'] = [{'formattedValue': contact_data['address']}]
+
+        requests.append({'createContact': {'contactToCreate': contact}})
+
+    try:
+        result = service.people().batchCreateContacts(body={'requests': requests}).execute()
+        return result.get('responses', [])
+    except HttpError as e:
+        raise APIError(f"Failed to batch create contacts: {e}")
+
+
+def update_contact(
+    resource_name_or_email: str,
+    name: Optional[str] = None,
+    email: Optional[str] = None,
+    phone: Optional[str] = None,
+    organization: Optional[str] = None,
+    address: Optional[str] = None
+) -> Dict[str, Any]:
+    """Update an existing contact.
+
+    Args:
+        resource_name_or_email: Contact resource name or email
+        name: New display name
+        email: New email address
+        phone: New phone number
+        organization: New organization name
+        address: New physical address
+
+    Returns:
+        Updated contact object
+
+    Raises:
+        ValidationError: If contact not found or no fields to update
+        APIError: If API call fails or etag conflict
+    """
+    # Get current contact with etag
+    current = get_contact(resource_name_or_email, fields="names,emailAddresses,phoneNumbers,organizations,addresses")
+    resource_name = current.get('resourceName')
+    etag = current.get('etag')
+
+    if not resource_name:
+        raise APIError("Could not determine resource name for contact")
+
+    # Build update object with only specified fields
+    update_obj = {
+        'resourceName': resource_name,
+        'etag': etag
+    }
+
+    if name is not None:
+        update_obj['names'] = [{'displayName': name}]
+
+    if email is not None:
+        update_obj['emailAddresses'] = [{'value': email}]
+
+    if phone is not None:
+        update_obj['phoneNumbers'] = [{'value': phone}]
+
+    if organization is not None:
+        update_obj['organizations'] = [{'name': organization}]
+
+    if address is not None:
+        update_obj['addresses'] = [{'formattedValue': address}]
+
+    # Check that at least one field was updated
+    if len(update_obj) <= 2:  # Only has resourceName and etag
+        raise ValidationError("No fields to update")
+
+    service = build_people_service()
+
+    # Determine which fields are being updated (exclude resourceName and etag)
+    update_fields = [k for k in update_obj.keys() if k not in ('resourceName', 'etag')]
+    update_mask = ','.join(update_fields)
+
+    try:
+        result = service.people().updateContact(
+            resourceName=resource_name,
+            body=update_obj,
+            updatePersonFields=update_mask
+        ).execute()
+        return result
+    except HttpError as e:
+        if e.resp.status == 409:
+            raise APIError(
+                f"Contact was modified by someone else. "
+                f"Fetch the latest version and try again."
+            )
+        raise APIError(f"Failed to update contact: {e}")
+
+
+def update_contact_batch(updates: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Update multiple contacts in a batch operation.
+
+    Args:
+        updates: List of update dicts (each must have 'email_or_id' and fields to update)
+
+    Returns:
+        List of update responses
+
+    Raises:
+        ValidationError: If updates list is empty or invalid
+        APIError: If API call fails
+    """
+    if not updates:
+        raise ValidationError("Updates list cannot be empty")
+
+    if len(updates) > 1000:
+        raise ValidationError("Maximum 1000 contacts per batch")
+
+    service = build_people_service()
+
+    requests = []
+    for update_data in updates:
+        email_or_id = update_data.get('email_or_id')
+        if not email_or_id:
+            raise ValidationError("Each update must have 'email_or_id'")
+
+        # Get current contact to get resource name and etag
+        current = get_contact(email_or_id)
+        resource_name = current.get('resourceName')
+        etag = current.get('etag')
+
+        if not resource_name:
+            continue  # Skip if can't find resource name
+
+        # Build update object with resourceName and etag
+        update_obj = {
+            'resourceName': resource_name,
+            'etag': etag
+        }
+        fields_to_update = []
+
+        if update_data.get('name') is not None:
+            update_obj['names'] = [{'displayName': update_data['name']}]
+            fields_to_update.append('names')
+
+        if update_data.get('email') is not None:
+            update_obj['emailAddresses'] = [{'value': update_data['email']}]
+            fields_to_update.append('emailAddresses')
+
+        if update_data.get('phone') is not None:
+            update_obj['phoneNumbers'] = [{'value': update_data['phone']}]
+            fields_to_update.append('phoneNumbers')
+
+        if update_data.get('organization') is not None:
+            update_obj['organizations'] = [{'name': update_data['organization']}]
+            fields_to_update.append('organizations')
+
+        if update_data.get('address') is not None:
+            update_obj['addresses'] = [{'formattedValue': update_data['address']}]
+            fields_to_update.append('addresses')
+
+        if fields_to_update:
+            requests.append({
+                'updateContact': {
+                    'contact': update_obj,
+                    'updatePersonFields': ','.join(fields_to_update)
+                }
+            })
+
+    if not requests:
+        raise ValidationError("No valid updates to process")
+
+    try:
+        result = service.people().batchUpdateContacts(body={'requests': requests}).execute()
+        return result.get('responses', [])
+    except HttpError as e:
+        raise APIError(f"Failed to batch update contacts: {e}")
+
+
+def delete_contact(resource_name_or_email: str) -> None:
+    """Delete a contact.
+
+    Args:
+        resource_name_or_email: Contact resource name or email
+
+    Raises:
+        ValidationError: If contact not found
+        APIError: If API call fails
+    """
+    # Get resource name if email provided
+    if "@" in resource_name_or_email and not resource_name_or_email.startswith("people/"):
+        contact = get_contact(resource_name_or_email, fields="names")
+        resource_name = contact.get('resourceName')
+    else:
+        resource_name = resource_name_or_email.strip()
+
+    if not resource_name:
+        raise ValidationError("Could not determine resource name for contact")
+
+    service = build_people_service()
+
+    try:
+        service.people().deleteContact(resourceName=resource_name).execute()
+    except HttpError as e:
+        if e.resp.status == 404:
+            raise ValidationError(f"Contact not found")
+        raise APIError(f"Failed to delete contact: {e}")
+
+
+def delete_contact_batch(resource_names: List[str]) -> List[Dict[str, Any]]:
+    """Delete multiple contacts in a batch operation.
+
+    Args:
+        resource_names: List of contact resource names
+
+    Returns:
+        List of delete responses
+
+    Raises:
+        ValidationError: If resource_names is empty
+        APIError: If API call fails
+    """
+    if not resource_names:
+        raise ValidationError("Resource names list cannot be empty")
+
+    if len(resource_names) > 1000:
+        raise ValidationError("Maximum 1000 contacts per batch")
+
+    service = build_people_service()
+
+    requests = [
+        {'deleteContact': {'resourceName': name}}
+        for name in resource_names
+    ]
+
+    try:
+        result = service.people().batchDeleteContacts(body={'requests': requests}).execute()
+        return result.get('responses', [])
+    except HttpError as e:
+        raise APIError(f"Failed to batch delete contacts: {e}")
