@@ -1,0 +1,328 @@
+"""Google Calendar API operations."""
+
+from typing import List, Dict, Any, Optional
+from datetime import datetime, timedelta
+import pytz
+
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
+
+from ..shared.auth import get_credentials, CALENDAR_SCOPES
+from ..shared.exceptions import APIError, ValidationError
+
+
+def build_calendar_service():
+    """Build and return Calendar API service object."""
+    creds = get_credentials(scopes=CALENDAR_SCOPES)
+    return build("calendar", "v3", credentials=creds)
+
+
+def list_calendars() -> List[Dict[str, Any]]:
+    """List all available calendars.
+
+    Returns:
+        List of calendar objects with id, summary, timezone, etc.
+    """
+    service = build_calendar_service()
+
+    try:
+        result = service.calendarList().list().execute()
+        return result.get('items', [])
+    except HttpError as e:
+        raise APIError(f"Failed to list calendars: {e}")
+
+
+def get_calendar(calendar_id: str) -> Dict[str, Any]:
+    """Get calendar details.
+
+    Args:
+        calendar_id: Calendar ID (e.g., "primary" or email)
+
+    Returns:
+        Calendar object
+    """
+    service = build_calendar_service()
+
+    try:
+        result = service.calendars().get(calendarId=calendar_id).execute()
+        return result
+    except HttpError as e:
+        raise APIError(f"Failed to get calendar '{calendar_id}': {e}")
+
+
+def validate_iso8601(timestamp: str) -> datetime:
+    """Validate and parse ISO8601 timestamp.
+
+    Args:
+        timestamp: ISO8601 formatted timestamp (with optional timezone)
+
+    Returns:
+        datetime object
+
+    Raises:
+        ValidationError: If format is invalid
+    """
+    formats = [
+        "%Y-%m-%dT%H:%M:%S%z",      # With timezone
+        "%Y-%m-%dT%H:%M:%S",        # Without timezone
+        "%Y-%m-%d",                 # Date only
+    ]
+
+    for fmt in formats:
+        try:
+            return datetime.strptime(timestamp, fmt)
+        except ValueError:
+            continue
+
+    # Try ISO8601 with colon in timezone
+    try:
+        # Python 3.7+ handles timezone offset with colon
+        return datetime.fromisoformat(timestamp)
+    except (ValueError, AttributeError):
+        pass
+
+    raise ValidationError(
+        f"Invalid ISO8601 timestamp: '{timestamp}'\n"
+        f"Expected format: 2025-01-15T14:00:00 or 2025-01-15T14:00:00+05:00"
+    )
+
+
+def create_event(
+    subject: str,
+    start_time: str,
+    duration_minutes: int = 60,
+    description: Optional[str] = None,
+    attendees: Optional[List[str]] = None,
+    calendar_id: str = "primary"
+) -> Dict[str, Any]:
+    """Create a calendar event.
+
+    Args:
+        subject: Event title
+        start_time: Start time in ISO8601 format
+        duration_minutes: Duration in minutes (default 60)
+        description: Event description
+        attendees: List of attendee email addresses
+        calendar_id: Calendar ID (default "primary")
+
+    Returns:
+        Created event object
+
+    Raises:
+        ValidationError: If input is invalid
+        APIError: If API call fails
+    """
+    # Validate and parse start time
+    start_dt = validate_iso8601(start_time)
+
+    # Add timezone if missing
+    if start_dt.tzinfo is None:
+        # Use primary calendar's timezone, or UTC if not available
+        try:
+            calendars = list_calendars()
+            primary = next((c for c in calendars if c.get('primary')), None)
+            tz_str = primary.get('timeZone', 'UTC') if primary else 'UTC'
+            tz = pytz.timezone(tz_str)
+        except Exception:
+            tz = pytz.UTC
+
+        start_dt = tz.localize(start_dt)
+
+    # Calculate end time
+    end_dt = start_dt + timedelta(minutes=duration_minutes)
+
+    # Build event object
+    event = {
+        'summary': subject,
+        'start': {
+            'dateTime': start_dt.isoformat(),
+            'timeZone': str(start_dt.tzinfo) if start_dt.tzinfo else 'UTC'
+        },
+        'end': {
+            'dateTime': end_dt.isoformat(),
+            'timeZone': str(end_dt.tzinfo) if end_dt.tzinfo else 'UTC'
+        }
+    }
+
+    if description:
+        event['description'] = description
+
+    if attendees:
+        event['attendees'] = [{'email': email.strip()} for email in attendees]
+
+    # Create event
+    service = build_calendar_service()
+
+    try:
+        result = service.events().insert(
+            calendarId=calendar_id,
+            body=event
+        ).execute()
+        return result
+    except HttpError as e:
+        raise APIError(f"Failed to create event: {e}")
+
+
+def get_event(event_id: str, calendar_id: str = "primary") -> Dict[str, Any]:
+    """Get event details.
+
+    Args:
+        event_id: Event ID
+        calendar_id: Calendar ID (default "primary")
+
+    Returns:
+        Event object
+    """
+    service = build_calendar_service()
+
+    try:
+        result = service.events().get(
+            calendarId=calendar_id,
+            eventId=event_id
+        ).execute()
+        return result
+    except HttpError as e:
+        raise APIError(f"Failed to get event '{event_id}': {e}")
+
+
+def update_event(
+    event_id: str,
+    subject: Optional[str] = None,
+    start_time: Optional[str] = None,
+    duration_minutes: Optional[int] = None,
+    description: Optional[str] = None,
+    attendees: Optional[List[str]] = None,
+    calendar_id: str = "primary"
+) -> Dict[str, Any]:
+    """Update a calendar event.
+
+    Args:
+        event_id: Event ID
+        subject: New event title
+        start_time: New start time in ISO8601
+        duration_minutes: New duration in minutes
+        description: New description
+        attendees: New attendee list
+        calendar_id: Calendar ID (default "primary")
+
+    Returns:
+        Updated event object
+    """
+    service = build_calendar_service()
+
+    # Get existing event first
+    event = get_event(event_id, calendar_id)
+
+    # Update fields
+    if subject:
+        event['summary'] = subject
+
+    if start_time:
+        start_dt = validate_iso8601(start_time)
+        if start_dt.tzinfo is None:
+            tz = pytz.UTC
+            start_dt = tz.localize(start_dt)
+        event['start'] = {
+            'dateTime': start_dt.isoformat(),
+            'timeZone': str(start_dt.tzinfo) if start_dt.tzinfo else 'UTC'
+        }
+
+    if duration_minutes is not None and start_time:
+        # Recalculate end time if duration is provided with new start time
+        start_dt = validate_iso8601(start_time)
+        if start_dt.tzinfo is None:
+            tz = pytz.UTC
+            start_dt = tz.localize(start_dt)
+        end_dt = start_dt + timedelta(minutes=duration_minutes)
+        event['end'] = {
+            'dateTime': end_dt.isoformat(),
+            'timeZone': str(start_dt.tzinfo) if start_dt.tzinfo else 'UTC'
+        }
+
+    if description:
+        event['description'] = description
+
+    if attendees is not None:
+        event['attendees'] = [{'email': email.strip()} for email in attendees]
+
+    # Perform update
+    try:
+        result = service.events().patch(
+            calendarId=calendar_id,
+            eventId=event_id,
+            body=event
+        ).execute()
+        return result
+    except HttpError as e:
+        raise APIError(f"Failed to update event: {e}")
+
+
+def delete_event(event_id: str, calendar_id: str = "primary") -> None:
+    """Delete a calendar event.
+
+    Args:
+        event_id: Event ID
+        calendar_id: Calendar ID (default "primary")
+    """
+    service = build_calendar_service()
+
+    try:
+        service.events().delete(
+            calendarId=calendar_id,
+            eventId=event_id
+        ).execute()
+    except HttpError as e:
+        raise APIError(f"Failed to delete event '{event_id}': {e}")
+
+
+def find_events(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    query: Optional[str] = None,
+    calendar_id: str = "primary"
+) -> List[Dict[str, Any]]:
+    """Find/list events in a calendar.
+
+    Args:
+        start_date: Start date in ISO8601 format (default: today)
+        end_date: End date in ISO8601 format (default: start_date + 7 days)
+        query: Search query (searches summary and description)
+        calendar_id: Calendar ID (default "primary")
+
+    Returns:
+        List of matching events
+    """
+    service = build_calendar_service()
+
+    # Default dates
+    if start_date is None:
+        start_dt = datetime.now(tz=pytz.UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+    else:
+        start_dt = validate_iso8601(start_date)
+        if start_dt.tzinfo is None:
+            start_dt = pytz.UTC.localize(start_dt)
+
+    if end_date is None:
+        end_dt = start_dt + timedelta(days=7)
+    else:
+        end_dt = validate_iso8601(end_date)
+        if end_dt.tzinfo is None:
+            end_dt = pytz.UTC.localize(end_dt)
+
+    # Build query
+    kwargs = {
+        'calendarId': calendar_id,
+        'timeMin': start_dt.isoformat(),
+        'timeMax': end_dt.isoformat(),
+        'singleEvents': True,
+        'orderBy': 'startTime'
+    }
+
+    if query:
+        kwargs['q'] = query
+
+    try:
+        result = service.events().list(**kwargs).execute()
+        return result.get('items', [])
+    except HttpError as e:
+        raise APIError(f"Failed to find events: {e}")

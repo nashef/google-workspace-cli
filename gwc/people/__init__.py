@@ -1,0 +1,1 @@
+"""people CLI commands."""
