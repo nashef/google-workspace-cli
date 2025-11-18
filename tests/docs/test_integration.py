@@ -430,3 +430,213 @@ class TestPhase2CommandInvocation:
             catch_exceptions=False,
         )
         assert result.exit_code in [0, 1]
+
+
+class TestPhase3TableAndImages:
+    """Test Phase 3 table and image commands."""
+
+    def test_insert_table_help(self, runner):
+        """Test insert-table command help."""
+        result = runner.invoke(docs_cli.main, ["insert-table", "--help"])
+        assert result.exit_code == 0
+        assert "DOCUMENT_ID" in result.output
+        assert "--rows" in result.output
+        assert "--columns" in result.output
+        assert "--index" in result.output
+
+    def test_insert_image_help(self, runner):
+        """Test insert-image command help."""
+        result = runner.invoke(docs_cli.main, ["insert-image", "--help"])
+        assert result.exit_code == 0
+        assert "DOCUMENT_ID" in result.output
+        assert "--image-url" in result.output
+        assert "--index" in result.output
+
+    def test_insert_page_break_help(self, runner):
+        """Test insert-page-break command help."""
+        result = runner.invoke(docs_cli.main, ["insert-page-break", "--help"])
+        assert result.exit_code == 0
+        assert "DOCUMENT_ID" in result.output
+        assert "--index" in result.output
+
+    def test_insert_footnote_help(self, runner):
+        """Test insert-footnote command help."""
+        result = runner.invoke(docs_cli.main, ["insert-footnote", "--help"])
+        assert result.exit_code == 0
+        assert "DOCUMENT_ID" in result.output
+        assert "--text" in result.output
+        assert "--index" in result.output
+
+    def test_create_header_help(self, runner):
+        """Test create-header command help."""
+        result = runner.invoke(docs_cli.main, ["create-header", "--help"])
+        assert result.exit_code == 0
+        assert "DOCUMENT_ID" in result.output
+
+    def test_create_footer_help(self, runner):
+        """Test create-footer command help."""
+        result = runner.invoke(docs_cli.main, ["create-footer", "--help"])
+        assert result.exit_code == 0
+        assert "DOCUMENT_ID" in result.output
+
+    def test_delete_header_help(self, runner):
+        """Test delete-header command help."""
+        result = runner.invoke(docs_cli.main, ["delete-header", "--help"])
+        assert result.exit_code == 0
+        assert "DOCUMENT_ID" in result.output
+
+    def test_delete_footer_help(self, runner):
+        """Test delete-footer command help."""
+        result = runner.invoke(docs_cli.main, ["delete-footer", "--help"])
+        assert result.exit_code == 0
+        assert "DOCUMENT_ID" in result.output
+
+
+class TestPhase3MissingArgs:
+    """Test error handling for Phase 3 commands."""
+
+    def test_insert_table_missing_rows(self, runner):
+        """Test insert-table without rows."""
+        result = runner.invoke(docs_cli.main, ["insert-table", "test_id", "--columns", "2", "--index", "0"])
+        assert result.exit_code != 0
+
+    def test_insert_table_missing_columns(self, runner):
+        """Test insert-table without columns."""
+        result = runner.invoke(docs_cli.main, ["insert-table", "test_id", "--rows", "3", "--index", "0"])
+        assert result.exit_code != 0
+
+    def test_insert_table_missing_index(self, runner):
+        """Test insert-table without index."""
+        result = runner.invoke(docs_cli.main, ["insert-table", "test_id", "--rows", "3", "--columns", "2"])
+        assert result.exit_code != 0
+
+    def test_insert_image_missing_url(self, runner):
+        """Test insert-image without URL."""
+        result = runner.invoke(docs_cli.main, ["insert-image", "test_id", "--index", "0"])
+        assert result.exit_code != 0
+
+    def test_insert_image_missing_index(self, runner):
+        """Test insert-image without index."""
+        result = runner.invoke(
+            docs_cli.main, ["insert-image", "test_id", "--image-url", "https://example.com/img.png"]
+        )
+        assert result.exit_code != 0
+
+    def test_insert_page_break_missing_index(self, runner):
+        """Test insert-page-break without index."""
+        result = runner.invoke(docs_cli.main, ["insert-page-break", "test_id"])
+        assert result.exit_code != 0
+
+    def test_insert_footnote_missing_text(self, runner):
+        """Test insert-footnote without text."""
+        result = runner.invoke(docs_cli.main, ["insert-footnote", "test_id", "--index", "0"])
+        assert result.exit_code != 0
+
+    def test_insert_footnote_missing_index(self, runner):
+        """Test insert-footnote without index."""
+        result = runner.invoke(docs_cli.main, ["insert-footnote", "test_id", "--text", "footnote"])
+        assert result.exit_code != 0
+
+    def test_delete_header_missing_header_id(self, runner):
+        """Test delete-header without header ID."""
+        result = runner.invoke(docs_cli.main, ["delete-header", "test_id"])
+        assert result.exit_code != 0
+
+    def test_delete_footer_missing_footer_id(self, runner):
+        """Test delete-footer without footer ID."""
+        result = runner.invoke(docs_cli.main, ["delete-footer", "test_id"])
+        assert result.exit_code != 0
+
+
+class TestPhase3CommandInvocation:
+    """Test that all Phase 3 commands can be invoked."""
+
+    def test_insert_table_invocation(self, runner):
+        """Test insert-table command invocation."""
+        result = runner.invoke(
+            docs_cli.main,
+            ["insert-table", "test_id", "--rows", "3", "--columns", "2", "--index", "0"],
+            catch_exceptions=False,
+        )
+        assert result.exit_code in [0, 1]
+
+    def test_insert_image_invocation(self, runner):
+        """Test insert-image command invocation."""
+        result = runner.invoke(
+            docs_cli.main,
+            ["insert-image", "test_id", "--image-url", "https://example.com/img.png", "--index", "0"],
+            catch_exceptions=False,
+        )
+        assert result.exit_code in [0, 1]
+
+    def test_insert_page_break_invocation(self, runner):
+        """Test insert-page-break command invocation."""
+        result = runner.invoke(
+            docs_cli.main,
+            ["insert-page-break", "test_id", "--index", "50"],
+            catch_exceptions=False,
+        )
+        assert result.exit_code in [0, 1]
+
+    def test_insert_footnote_invocation(self, runner):
+        """Test insert-footnote command invocation."""
+        result = runner.invoke(
+            docs_cli.main,
+            ["insert-footnote", "test_id", "--text", "See appendix", "--index", "50"],
+            catch_exceptions=False,
+        )
+        assert result.exit_code in [0, 1]
+
+    def test_create_header_invocation(self, runner):
+        """Test create-header command invocation."""
+        result = runner.invoke(
+            docs_cli.main,
+            ["create-header", "test_id"],
+            catch_exceptions=False,
+        )
+        assert result.exit_code in [0, 1]
+
+    def test_create_header_with_section(self, runner):
+        """Test create-header with section ID."""
+        result = runner.invoke(
+            docs_cli.main,
+            ["create-header", "test_id", "--section-id", "1"],
+            catch_exceptions=False,
+        )
+        assert result.exit_code in [0, 1]
+
+    def test_create_footer_invocation(self, runner):
+        """Test create-footer command invocation."""
+        result = runner.invoke(
+            docs_cli.main,
+            ["create-footer", "test_id"],
+            catch_exceptions=False,
+        )
+        assert result.exit_code in [0, 1]
+
+    def test_create_footer_with_section(self, runner):
+        """Test create-footer with section ID."""
+        result = runner.invoke(
+            docs_cli.main,
+            ["create-footer", "test_id", "--section-id", "1"],
+            catch_exceptions=False,
+        )
+        assert result.exit_code in [0, 1]
+
+    def test_delete_header_invocation(self, runner):
+        """Test delete-header command invocation."""
+        result = runner.invoke(
+            docs_cli.main,
+            ["delete-header", "test_id", "header_id_123"],
+            catch_exceptions=False,
+        )
+        assert result.exit_code in [0, 1]
+
+    def test_delete_footer_invocation(self, runner):
+        """Test delete-footer command invocation."""
+        result = runner.invoke(
+            docs_cli.main,
+            ["delete-footer", "test_id", "footer_id_123"],
+            catch_exceptions=False,
+        )
+        assert result.exit_code in [0, 1]

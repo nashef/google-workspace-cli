@@ -269,14 +269,156 @@ gwc-docs format-text $DOC_ID --start-index 0 --end-index 100 --italic
    - Multiple operations in sequence may fail individually
    - For complex multi-step operations, consider Phase 4 batch updates
 
-## Coming in Phase 3+
+## Phase 3: Tables, Images & Advanced Structures
 
-- Insert tables and manage rows/columns
-- Insert images from URLs or files
-- Add headers, footers, page breaks
-- Insert footnotes and endnotes
-- Batch update operations
-- Document manipulation and editing
+Phase 3 enables **structural elements** in documents:
+- ✅ Insert tables with specified rows/columns
+- ✅ Insert images from URLs
+- ✅ Add page breaks
+- ✅ Insert footnotes
+- ✅ Create and delete headers/footers
+- ✅ Manage document sections
+
+### Phase 3 Commands
+
+#### Table Operations
+
+| Task | Command |
+|------|---------|
+| Insert table | `insert-table doc_id --rows 3 --columns 2 --index 0` |
+
+#### Image Operations
+
+| Task | Command |
+|------|---------|
+| Insert image from URL | `insert-image doc_id --image-url "https://..." --index 0` |
+
+#### Structural Elements
+
+| Task | Command |
+|------|---------|
+| Insert page break | `insert-page-break doc_id --index 50` |
+| Insert footnote | `insert-footnote doc_id --text "Citation" --index 50` |
+| Create header | `create-header doc_id` |
+| Create header (section) | `create-header doc_id --section-id 1` |
+| Create footer | `create-footer doc_id` |
+| Create footer (section) | `create-footer doc_id --section-id 1` |
+| Delete header | `delete-header doc_id header_id_here` |
+| Delete footer | `delete-footer doc_id footer_id_here` |
+
+### Phase 3 Examples
+
+**Report with Tables:**
+```bash
+# Create document
+DOC_ID=$(poetry run gwc-docs create --title "Sales Report" | grep id | cut -d'"' -f4)
+
+# Add title
+gwc-docs insert-text $DOC_ID --text "Q4 Sales Report" --index 0
+gwc-docs format-text $DOC_ID --start-index 0 --end-index 15 --bold --size 16
+
+# Add table
+gwc-docs insert-table $DOC_ID --rows 4 --columns 3 --index 20
+# Table structure: [Month | Q1 Sales | Q2 Sales | Q3 Sales | Q4 Sales]
+#                  [Jan   | ...     | ...     | ...     | ...]
+#                  [Feb   | ...     | ...     | ...     | ...]
+#                  [Mar   | ...     | ...     | ...     | ...]
+
+# Add page break for summary section
+gwc-docs insert-page-break $DOC_ID --index 100
+
+# Add footer
+FOOTER_ID=$(poetry run gwc-docs create-footer $DOC_ID)
+```
+
+**Document with Headers/Footers:**
+```bash
+# Create main document
+DOC_ID=$(poetry run gwc-docs create --title "Formal Report" | grep id | cut -d'"' -f4)
+
+# Add content
+gwc-docs insert-text $DOC_ID --text "Chapter 1: Introduction" --index 0
+
+# Create header with page numbers
+gwc-docs create-header $DOC_ID
+
+# Create footer with copyright
+gwc-docs create-footer $DOC_ID
+```
+
+**Document with Images:**
+```bash
+# Create document
+DOC_ID=$(poetry run gwc-docs create --title "Product Presentation" | grep id | cut -d'"' -f4)
+
+# Add title
+gwc-docs insert-text $DOC_ID --text "Product Overview" --index 0
+gwc-docs format-text $DOC_ID --start-index 0 --end-index 16 --bold --size 18
+
+# Insert company logo
+gwc-docs insert-image $DOC_ID --image-url "https://company.com/logo.png" --index 20
+
+# Add text below image
+gwc-docs insert-text $DOC_ID --text "\n\nProduct Features:" --index 21
+
+# Add more images and content
+gwc-docs insert-image $DOC_ID --image-url "https://company.com/feature1.png" --index 50
+```
+
+**Document with Footnotes:**
+```bash
+# Create document
+DOC_ID=$(poetry run gwc-docs create --title "Academic Paper" | grep id | cut -d'"' -f4)
+
+# Add text with citation placeholder
+gwc-docs insert-text $DOC_ID --text "According to recent research " --index 0
+gwc-docs insert-text $DOC_ID --text "[1] " --index 30
+
+# Add footnote
+gwc-docs insert-footnote $DOC_ID --text "Smith et al., 2024" --index 32
+```
+
+### Phase 3 Important Notes
+
+1. **Table IDs:**
+   - Tables return a `tableId` when inserted
+   - Use this ID for future row/column operations
+   - Store the ID for later manipulation (Phase 4)
+
+2. **Image URLs:**
+   - Only URLs work (no local files yet)
+   - Must be publicly accessible
+   - Returns `objectId` for tracking
+
+3. **Headers/Footers:**
+   - Each section can have its own header/footer
+   - Default section ID is 0 (first section)
+   - IDs returned can be used for deletion
+
+4. **Footnotes:**
+   - Automatically numbered by Google Docs
+   - Can be endnotes or footnotes
+   - Text is required parameter
+
+5. **Page Structure:**
+   - Document can have multiple sections
+   - Each section supports headers/footers
+   - Page breaks force content to new page
+
+6. **Index Management:**
+   - Plan indices carefully when combining operations
+   - Index 0 = start of document
+   - Each insertion shifts subsequent indices
+   - Consider batching complex operations (Phase 4)
+
+## Coming in Phase 4
+
+- Manage table rows/columns (insert/delete rows)
+- Batch update operations for efficiency
+- Suggestions and tracked changes
+- Named ranges for templating
+- Document merging and mail merge
+- Complex automation workflows
 
 ## Documentation
 

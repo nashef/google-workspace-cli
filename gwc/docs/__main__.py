@@ -19,6 +19,14 @@ from gwc.docs.operations import (
     replace_text,
     format_text,
     format_paragraph,
+    insert_table,
+    insert_image,
+    insert_page_break,
+    insert_footnote,
+    create_header,
+    create_footer,
+    delete_header,
+    delete_footer,
 )
 from gwc.shared.output import format_output, OutputFormat
 
@@ -390,6 +398,157 @@ def format_paragraph_cmd(
         click.echo(f"Paragraph formatted from index {start_index} to {end_index}")
     except Exception as e:
         click.echo(f"Error formatting paragraph: {e}", err=True)
+        raise click.Abort()
+
+
+# ============================================================================
+# Phase 3: Tables, Images & Advanced Structures
+# ============================================================================
+
+
+@main.command()
+@click.argument("document_id")
+@click.option("--rows", type=int, required=True, help="Number of rows")
+@click.option("--columns", type=int, required=True, help="Number of columns")
+@click.option("--index", type=int, required=True, help="Position to insert at")
+def insert_table_cmd(document_id, rows, columns, index):
+    """Insert a table at a specific position.
+
+    Examples:
+        gwc-docs insert-table doc_id --rows 3 --columns 2 --index 0
+        gwc-docs insert-table doc_id --rows 5 --columns 4 --index 100
+    """
+    try:
+        table_id = insert_table(document_id, rows, columns, index)
+        click.echo(f"Table inserted at index {index} with ID: {table_id}")
+    except Exception as e:
+        click.echo(f"Error inserting table: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("document_id")
+@click.option("--image-url", required=True, help="URL of the image to insert")
+@click.option("--index", type=int, required=True, help="Position to insert at")
+def insert_image_cmd(document_id, image_url, index):
+    """Insert an image from a URL.
+
+    Examples:
+        gwc-docs insert-image doc_id --image-url "https://example.com/logo.png" --index 0
+        gwc-docs insert-image doc_id --image-url "https://example.com/image.jpg" --index 50
+    """
+    try:
+        object_id = insert_image(document_id, image_url, index)
+        click.echo(f"Image inserted at index {index} with ID: {object_id}")
+    except Exception as e:
+        click.echo(f"Error inserting image: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("document_id")
+@click.option("--index", type=int, required=True, help="Position to insert at")
+def insert_page_break_cmd(document_id, index):
+    """Insert a page break at a specific position.
+
+    Examples:
+        gwc-docs insert-page-break doc_id --index 50
+        gwc-docs insert-page-break doc_id --index 100
+    """
+    try:
+        insert_page_break(document_id, index)
+        click.echo(f"Page break inserted at index {index}")
+    except Exception as e:
+        click.echo(f"Error inserting page break: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("document_id")
+@click.option("--text", required=True, help="Footnote text")
+@click.option("--index", type=int, required=True, help="Position to insert at")
+def insert_footnote_cmd(document_id, text, index):
+    """Insert a footnote at a specific position.
+
+    Examples:
+        gwc-docs insert-footnote doc_id --text "See appendix A" --index 50
+        gwc-docs insert-footnote doc_id --text "Citation here" --index 100
+    """
+    try:
+        insert_footnote(document_id, index, text)
+        click.echo(f"Footnote inserted at index {index}")
+    except Exception as e:
+        click.echo(f"Error inserting footnote: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("document_id")
+@click.option("--section-id", type=int, default=0, help="Section ID (default: 0)")
+def create_header_cmd(document_id, section_id):
+    """Create a header for a section.
+
+    Examples:
+        gwc-docs create-header doc_id
+        gwc-docs create-header doc_id --section-id 1
+    """
+    try:
+        header_id = create_header(document_id, section_id)
+        click.echo(f"Header created for section {section_id} with ID: {header_id}")
+    except Exception as e:
+        click.echo(f"Error creating header: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("document_id")
+@click.option("--section-id", type=int, default=0, help="Section ID (default: 0)")
+def create_footer_cmd(document_id, section_id):
+    """Create a footer for a section.
+
+    Examples:
+        gwc-docs create-footer doc_id
+        gwc-docs create-footer doc_id --section-id 1
+    """
+    try:
+        footer_id = create_footer(document_id, section_id)
+        click.echo(f"Footer created for section {section_id} with ID: {footer_id}")
+    except Exception as e:
+        click.echo(f"Error creating footer: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("document_id")
+@click.argument("header_id")
+def delete_header_cmd(document_id, header_id):
+    """Delete a header from a section.
+
+    Examples:
+        gwc-docs delete-header doc_id header_id_here
+    """
+    try:
+        delete_header(document_id, header_id)
+        click.echo(f"Header {header_id} deleted")
+    except Exception as e:
+        click.echo(f"Error deleting header: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("document_id")
+@click.argument("footer_id")
+def delete_footer_cmd(document_id, footer_id):
+    """Delete a footer from a section.
+
+    Examples:
+        gwc-docs delete-footer doc_id footer_id_here
+    """
+    try:
+        delete_footer(document_id, footer_id)
+        click.echo(f"Footer {footer_id} deleted")
+    except Exception as e:
+        click.echo(f"Error deleting footer: {e}", err=True)
         raise click.Abort()
 
 

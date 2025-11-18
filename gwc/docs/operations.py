@@ -1,4 +1,4 @@
-"""Google Docs API operations for Phase 1 & Phase 2."""
+"""Google Docs API operations for Phase 1, Phase 2 & Phase 3."""
 
 import json
 from typing import Any, Dict, List, Optional, Tuple
@@ -746,4 +746,221 @@ def format_paragraph(
 
     result = service.documents().batchUpdate(documentId=document_id, body={"requests": requests}).execute()
 
+    return result
+
+
+# ============================================================================
+# Phase 3: Tables, Images & Advanced Structures
+# ============================================================================
+
+
+def insert_table(document_id: str, rows: int, columns: int, index: int) -> str:
+    """Insert a table at a specific position.
+
+    Args:
+        document_id: Document ID
+        rows: Number of rows
+        columns: Number of columns
+        index: Position to insert at
+
+    Returns:
+        Table ID of the inserted table
+    """
+    service = get_docs_service()
+
+    requests = [
+        {
+            "insertTable": {
+                "rows": rows,
+                "columns": columns,
+                "location": {"index": index},
+            }
+        }
+    ]
+
+    result = service.documents().batchUpdate(documentId=document_id, body={"requests": requests}).execute()
+
+    # Extract table ID from reply
+    table_id = result.get("replies", [{}])[0].get("insertTable", {}).get("tableId", "")
+    return table_id
+
+
+def insert_image(document_id: str, image_url: str, index: int) -> str:
+    """Insert an image from a URL into the document.
+
+    Args:
+        document_id: Document ID
+        image_url: URL of the image to insert
+        index: Position to insert at
+
+    Returns:
+        Object ID of the inserted image
+    """
+    service = get_docs_service()
+
+    requests = [
+        {
+            "insertInlineImage": {
+                "uri": image_url,
+                "location": {"index": index},
+            }
+        }
+    ]
+
+    result = service.documents().batchUpdate(documentId=document_id, body={"requests": requests}).execute()
+
+    # Extract object ID from reply
+    object_id = result.get("replies", [{}])[0].get("insertInlineImage", {}).get("objectId", "")
+    return object_id
+
+
+def insert_page_break(document_id: str, index: int) -> Dict[str, Any]:
+    """Insert a page break at a specific position.
+
+    Args:
+        document_id: Document ID
+        index: Position to insert at
+
+    Returns:
+        Batch update result
+    """
+    service = get_docs_service()
+
+    requests = [
+        {
+            "insertPageBreak": {
+                "location": {"index": index}
+            }
+        }
+    ]
+
+    result = service.documents().batchUpdate(documentId=document_id, body={"requests": requests}).execute()
+    return result
+
+
+def insert_footnote(document_id: str, index: int, text: str) -> Dict[str, Any]:
+    """Insert a footnote at a specific position.
+
+    Args:
+        document_id: Document ID
+        index: Position to insert at
+        text: Text content of the footnote
+
+    Returns:
+        Batch update result with footnote ID
+    """
+    service = get_docs_service()
+
+    requests = [
+        {
+            "insertFootnote": {
+                "location": {"index": index},
+                "text": text,
+            }
+        }
+    ]
+
+    result = service.documents().batchUpdate(documentId=document_id, body={"requests": requests}).execute()
+    return result
+
+
+def create_header(document_id: str, section_id: int = 0) -> str:
+    """Create a header for a section.
+
+    Args:
+        document_id: Document ID
+        section_id: Section ID (0 for first section)
+
+    Returns:
+        Header ID
+    """
+    service = get_docs_service()
+
+    requests = [
+        {
+            "createHeader": {
+                "sectionId": section_id
+            }
+        }
+    ]
+
+    result = service.documents().batchUpdate(documentId=document_id, body={"requests": requests}).execute()
+
+    # Extract header ID from reply
+    header_id = result.get("replies", [{}])[0].get("createHeader", {}).get("headerId", "")
+    return header_id
+
+
+def create_footer(document_id: str, section_id: int = 0) -> str:
+    """Create a footer for a section.
+
+    Args:
+        document_id: Document ID
+        section_id: Section ID (0 for first section)
+
+    Returns:
+        Footer ID
+    """
+    service = get_docs_service()
+
+    requests = [
+        {
+            "createFooter": {
+                "sectionId": section_id
+            }
+        }
+    ]
+
+    result = service.documents().batchUpdate(documentId=document_id, body={"requests": requests}).execute()
+
+    # Extract footer ID from reply
+    footer_id = result.get("replies", [{}])[0].get("createFooter", {}).get("footerId", "")
+    return footer_id
+
+
+def delete_header(document_id: str, header_id: str) -> Dict[str, Any]:
+    """Delete a header from a section.
+
+    Args:
+        document_id: Document ID
+        header_id: Header ID to delete
+
+    Returns:
+        Batch update result
+    """
+    service = get_docs_service()
+
+    requests = [
+        {
+            "deleteHeader": {
+                "headerId": header_id
+            }
+        }
+    ]
+
+    result = service.documents().batchUpdate(documentId=document_id, body={"requests": requests}).execute()
+    return result
+
+
+def delete_footer(document_id: str, footer_id: str) -> Dict[str, Any]:
+    """Delete a footer from a section.
+
+    Args:
+        document_id: Document ID
+        footer_id: Footer ID to delete
+
+    Returns:
+        Batch update result
+    """
+    service = get_docs_service()
+
+    requests = [
+        {
+            "deleteFooter": {
+                "footerId": footer_id
+            }
+        }
+    ]
+
+    result = service.documents().batchUpdate(documentId=document_id, body={"requests": requests}).execute()
     return result
