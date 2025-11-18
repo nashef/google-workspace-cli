@@ -94,6 +94,10 @@ def create_event(
     description: Optional[str] = None,
     attendees: Optional[List[str]] = None,
     add_meet: bool = False,
+    location: Optional[str] = None,
+    transparency: Optional[str] = None,
+    visibility: Optional[str] = None,
+    send_updates: Optional[str] = None,
     calendar_id: str = "primary"
 ) -> Dict[str, Any]:
     """Create a calendar event.
@@ -105,6 +109,10 @@ def create_event(
         description: Event description
         attendees: List of attendee email addresses
         add_meet: Whether to add a Google Meet conference (default False)
+        location: Event location (freeform text or address)
+        transparency: "opaque" (busy) or "transparent" (free)
+        visibility: "default", "public", "private", or "confidential"
+        send_updates: "all", "externalOnly", or "none" - notify guests
         calendar_id: Calendar ID (default "primary")
 
     Returns:
@@ -149,8 +157,21 @@ def create_event(
     if description:
         event['description'] = description
 
+    if location:
+        event['location'] = location
+
     if attendees:
         event['attendees'] = [{'email': email.strip()} for email in attendees]
+
+    if transparency:
+        if transparency not in ('opaque', 'transparent'):
+            raise ValidationError(f"transparency must be 'opaque' or 'transparent', got '{transparency}'")
+        event['transparency'] = transparency
+
+    if visibility:
+        if visibility not in ('default', 'public', 'private', 'confidential'):
+            raise ValidationError(f"visibility must be one of: default, public, private, confidential (got '{visibility}')")
+        event['visibility'] = visibility
 
     if add_meet:
         event['conferenceData'] = {
@@ -166,11 +187,15 @@ def create_event(
     service = build_calendar_service()
 
     try:
-        result = service.events().insert(
-            calendarId=calendar_id,
-            body=event,
-            conferenceDataVersion=1 if add_meet else 0
-        ).execute()
+        kwargs = {
+            'calendarId': calendar_id,
+            'body': event,
+            'conferenceDataVersion': 1 if add_meet else 0
+        }
+        if send_updates:
+            kwargs['sendUpdates'] = send_updates
+
+        result = service.events().insert(**kwargs).execute()
         return result
     except HttpError as e:
         raise APIError(f"Failed to create event: {e}")
@@ -206,6 +231,10 @@ def update_event(
     description: Optional[str] = None,
     attendees: Optional[List[str]] = None,
     add_meet: bool = False,
+    location: Optional[str] = None,
+    transparency: Optional[str] = None,
+    visibility: Optional[str] = None,
+    send_updates: Optional[str] = None,
     calendar_id: str = "primary"
 ) -> Dict[str, Any]:
     """Update a calendar event.
@@ -218,6 +247,10 @@ def update_event(
         description: New description
         attendees: New attendee list
         add_meet: Whether to add a Google Meet conference
+        location: Event location (freeform text or address)
+        transparency: "opaque" (busy) or "transparent" (free)
+        visibility: "default", "public", "private", or "confidential"
+        send_updates: "all", "externalOnly", or "none" - notify guests
         calendar_id: Calendar ID (default "primary")
 
     Returns:
@@ -257,8 +290,21 @@ def update_event(
     if description:
         event['description'] = description
 
+    if location:
+        event['location'] = location
+
     if attendees is not None:
         event['attendees'] = [{'email': email.strip()} for email in attendees]
+
+    if transparency:
+        if transparency not in ('opaque', 'transparent'):
+            raise ValidationError(f"transparency must be 'opaque' or 'transparent', got '{transparency}'")
+        event['transparency'] = transparency
+
+    if visibility:
+        if visibility not in ('default', 'public', 'private', 'confidential'):
+            raise ValidationError(f"visibility must be one of: default, public, private, confidential (got '{visibility}')")
+        event['visibility'] = visibility
 
     if add_meet:
         event['conferenceData'] = {
@@ -272,12 +318,16 @@ def update_event(
 
     # Perform update
     try:
-        result = service.events().patch(
-            calendarId=calendar_id,
-            eventId=event_id,
-            body=event,
-            conferenceDataVersion=1 if add_meet else 0
-        ).execute()
+        kwargs = {
+            'calendarId': calendar_id,
+            'eventId': event_id,
+            'body': event,
+            'conferenceDataVersion': 1 if add_meet else 0
+        }
+        if send_updates:
+            kwargs['sendUpdates'] = send_updates
+
+        result = service.events().patch(**kwargs).execute()
         return result
     except HttpError as e:
         raise APIError(f"Failed to update event: {e}")

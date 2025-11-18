@@ -190,6 +190,30 @@ def list(output):
     help='Add a Google Meet conference to the event'
 )
 @click.option(
+    '--location',
+    help='Event location (address or room name)'
+)
+@click.option(
+    '--transparency',
+    type=click.Choice(['opaque', 'transparent']),
+    help='opaque=busy (default), transparent=free'
+)
+@click.option(
+    '--visibility',
+    type=click.Choice(['default', 'public', 'private', 'confidential']),
+    help='Event visibility (default: depends on calendar)'
+)
+@click.option(
+    '--description-file',
+    type=click.File('r'),
+    help='Read event description from file'
+)
+@click.option(
+    '--notify',
+    type=click.Choice(['all', 'externalOnly', 'none']),
+    help='Notify guests when creating event'
+)
+@click.option(
     '--calendar',
     default='primary',
     help='Calendar ID (default: primary)'
@@ -200,12 +224,13 @@ def list(output):
     default='unix',
     help='Output format (default: unix)'
 )
-def create(time, subject, duration, attendees, description, meet, calendar, output):
+def create(time, subject, duration, attendees, description, meet, location, transparency, visibility, description_file, notify, calendar, output):
     """Create a new calendar event.
 
     Examples:
         gwc-cal create --time 2025-01-15T14:00:00 --subject "Team Meeting"
-        gwc-cal create --time 2025-01-15T14:00:00 --subject "Team Meeting" --meet
+        gwc-cal create --time 2025-01-15T14:00:00 --subject "Team Meeting" --meet --location "Conf Room A"
+        gwc-cal create --time 2025-01-15T14:00:00 --subject "Standup" --transparency transparent
     """
     try:
         # Parse attendees
@@ -213,13 +238,22 @@ def create(time, subject, duration, attendees, description, meet, calendar, outp
         if attendees:
             attendee_list = [a.strip() for a in attendees.split(',')]
 
+        # Get description from file if provided, otherwise use inline
+        final_description = description
+        if description_file:
+            final_description = description_file.read()
+
         event = operations.create_event(
             subject=subject,
             start_time=time,
             duration_minutes=duration,
-            description=description,
+            description=final_description,
             attendees=attendee_list,
             add_meet=meet,
+            location=location,
+            transparency=transparency,
+            visibility=visibility,
+            send_updates=notify,
             calendar_id=calendar
         )
 
@@ -297,6 +331,30 @@ def get(event_id, calendar, output):
     help='Add a Google Meet conference to the event'
 )
 @click.option(
+    '--location',
+    help='Event location (address or room name)'
+)
+@click.option(
+    '--transparency',
+    type=click.Choice(['opaque', 'transparent']),
+    help='opaque=busy (default), transparent=free'
+)
+@click.option(
+    '--visibility',
+    type=click.Choice(['default', 'public', 'private', 'confidential']),
+    help='Event visibility (default: depends on calendar)'
+)
+@click.option(
+    '--description-file',
+    type=click.File('r'),
+    help='Read event description from file'
+)
+@click.option(
+    '--notify',
+    type=click.Choice(['all', 'externalOnly', 'none']),
+    help='Notify guests when updating event'
+)
+@click.option(
     '--calendar',
     default='primary',
     help='Calendar ID (default: primary)'
@@ -307,14 +365,15 @@ def get(event_id, calendar, output):
     default='unix',
     help='Output format (default: unix)'
 )
-def update(event_id, time, subject, duration, attendees, description, meet, calendar, output):
+def update(event_id, time, subject, duration, attendees, description, meet, location, transparency, visibility, description_file, notify, calendar, output):
     """Update a calendar event.
 
     Only specified fields are updated.
 
     Examples:
         gwc-cal update abc123def456 --subject "New Title"
-        gwc-cal update abc123def456 --meet
+        gwc-cal update abc123def456 --meet --notify all
+        gwc-cal update abc123def456 --location "Room 101" --notify externalOnly
     """
     try:
         # Parse attendees
@@ -322,14 +381,23 @@ def update(event_id, time, subject, duration, attendees, description, meet, cale
         if attendees:
             attendee_list = [a.strip() for a in attendees.split(',')]
 
+        # Get description from file if provided, otherwise use inline
+        final_description = description
+        if description_file:
+            final_description = description_file.read()
+
         event = operations.update_event(
             event_id=event_id,
             subject=subject,
             start_time=time,
             duration_minutes=duration,
-            description=description,
+            description=final_description,
             attendees=attendee_list,
             add_meet=meet,
+            location=location,
+            transparency=transparency,
+            visibility=visibility,
+            send_updates=notify,
             calendar_id=calendar
         )
 
