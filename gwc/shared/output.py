@@ -14,7 +14,7 @@ class OutputFormat(Enum):
 
 def format_output(
     data: Any,
-    format_type: OutputFormat = OutputFormat.UNIX,
+    format_type: Any = OutputFormat.UNIX,
     fields: Optional[List[str]] = None,
     headers: Optional[List[str]] = None
 ) -> str:
@@ -22,13 +22,20 @@ def format_output(
 
     Args:
         data: Data to format (dict, list of dicts, or string)
-        format_type: Output format (unix, json, llm)
+        format_type: Output format (unix, json, llm) - can be string or OutputFormat enum
         fields: Fields to include for dict/list (order matters)
         headers: Header names to use instead of field names
 
     Returns:
         Formatted string ready to print
     """
+    # Convert string to enum if needed
+    if isinstance(format_type, str):
+        try:
+            format_type = OutputFormat(format_type)
+        except ValueError:
+            raise ValueError(f"Unknown format: {format_type}. Valid options: unix, json, llm")
+
     if format_type == OutputFormat.JSON:
         return _format_json(data)
     elif format_type == OutputFormat.UNIX:
