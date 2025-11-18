@@ -159,18 +159,28 @@ poetry run gwc-email labels --help
 
 ## All Available Commands
 
-**Core Operations:**
+**Reading & Searching (Phase 1):**
 - `list` - List messages from a label
 - `get` - Get full message details
 - `search` - Search messages using Gmail syntax
 - `thread` - Get all messages in a thread
 
-**Labels:**
+**Composing & Sending (Phase 2):**
+- `send` - Send message directly (no draft)
+- `draft create` - Create draft message (unsent)
+- `draft list` - List all drafts
+- `draft get` - Get draft details
+- `draft send` - Send existing draft
+- `draft delete` - Delete draft
+- `reply` - Reply to a message
+- `forward` - Forward message to recipient
+
+**Labels & Organization:**
 - `labels list` - List all labels
 - `labels get` - Get label details
 - `labels map` - Show name→ID mapping
 
-**Help:**
+**Help & Reference:**
 - `search-help` - Show search query examples
 
 ## Common Workflows
@@ -218,6 +228,67 @@ poetry run gwc-email list --label Starred --output llm
 
 # See drafts
 poetry run gwc-email list --label DRAFT --output llm
+```
+
+### Send a Simple Email
+```bash
+# Send directly
+poetry run gwc-email send --to alice@example.com --subject "Hello" --body "Hi there!"
+```
+
+### Create and Send Draft
+```bash
+# Create draft
+poetry run gwc-email draft create --to alice@example.com --subject "Meeting" --body "Can we meet tomorrow?"
+
+# List drafts
+poetry run gwc-email draft list --output llm
+
+# Send the draft
+poetry run gwc-email draft send draft_id_here
+```
+
+### Send with Attachments
+```bash
+# Single attachment
+poetry run gwc-email send --to alice@example.com --subject "Report" --body "See attached" \
+  --attachments /path/to/report.pdf
+
+# Multiple attachments
+poetry run gwc-email send --to alice@example.com --subject "Files" --body "Here are the files" \
+  --attachments /path/to/file1.pdf --attachments /path/to/file2.xlsx
+```
+
+### Send with CC and BCC
+```bash
+# CC someone
+poetry run gwc-email send --to alice@example.com --cc bob@example.com \
+  --subject "Update" --body "Copying Bob on this"
+
+# Add BCC
+poetry run gwc-email send --to alice@example.com --bcc manager@example.com \
+  --subject "Report" --body "For your records"
+```
+
+### Reply to Message
+```bash
+# Reply to sender only
+poetry run gwc-email reply msg123 --body "Thanks for your message!"
+
+# Reply to all (including CC)
+poetry run gwc-email reply msg123 --reply-all --body "Everyone, please see my response below"
+```
+
+### Forward Message
+```bash
+# Forward to someone
+poetry run gwc-email forward msg123 --to alice@example.com
+
+# Forward with additional text
+poetry run gwc-email forward msg123 --to alice@example.com --body "This is important, thought you should see it"
+
+# Forward with custom subject
+poetry run gwc-email forward msg123 --to alice@example.com --subject "FYI: Project Update"
 ```
 
 ## Tips & Tricks
