@@ -214,6 +214,11 @@ def list(output):
     help='Notify guests when creating event'
 )
 @click.option(
+    '--reminder',
+    multiple=True,
+    help='Set reminders: "method:minutes" (e.g., "popup:10" or "email:1440") or "default"'
+)
+@click.option(
     '--calendar',
     default='primary',
     help='Calendar ID (default: primary)'
@@ -224,7 +229,7 @@ def list(output):
     default='unix',
     help='Output format (default: unix)'
 )
-def create(time, subject, duration, attendees, description, meet, location, transparency, visibility, description_file, notify, calendar, output):
+def create(time, subject, duration, attendees, description, meet, location, transparency, visibility, description_file, notify, reminder, calendar, output):
     """Create a new calendar event.
 
     Examples:
@@ -253,6 +258,7 @@ def create(time, subject, duration, attendees, description, meet, location, tran
             location=location,
             transparency=transparency,
             visibility=visibility,
+            reminders=list(reminder) if reminder else None,
             send_updates=notify,
             calendar_id=calendar
         )
@@ -365,6 +371,11 @@ def get(event_id, calendar, output):
     help='Remove an attendee (can be used multiple times)'
 )
 @click.option(
+    '--reminder',
+    multiple=True,
+    help='Set reminders: "method:minutes" (e.g., "popup:10" or "email:1440") or "default"'
+)
+@click.option(
     '--calendar',
     default='primary',
     help='Calendar ID (default: primary)'
@@ -375,7 +386,7 @@ def get(event_id, calendar, output):
     default='unix',
     help='Output format (default: unix)'
 )
-def update(event_id, time, subject, duration, attendees, description, meet, location, transparency, visibility, description_file, notify, add_attendee, remove_attendee, calendar, output):
+def update(event_id, time, subject, duration, attendees, description, meet, location, transparency, visibility, description_file, notify, add_attendee, remove_attendee, reminder, calendar, output):
     """Update a calendar event.
 
     Only specified fields are updated.
@@ -429,6 +440,7 @@ def update(event_id, time, subject, duration, attendees, description, meet, loca
             location=location,
             transparency=transparency,
             visibility=visibility,
+            reminders=list(reminder) if reminder else None,
             send_updates=notify,
             calendar_id=calendar
         )

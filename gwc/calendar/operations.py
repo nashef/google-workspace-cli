@@ -50,6 +50,62 @@ def get_calendar(calendar_id: str) -> Dict[str, Any]:
         raise APIError(f"Failed to get calendar '{calendar_id}': {e}")
 
 
+def parse_reminders(reminder_strings: Optional[List[str]]) -> Optional[Dict[str, Any]]:
+    """Parse reminder specification strings into reminders object.
+
+    Args:
+        reminder_strings: List of "method:minutes" strings (e.g., ["popup:10", "email:1440"])
+                         or ["default"] to use calendar defaults
+
+    Returns:
+        Reminders dict for event, or None if no reminders specified
+
+    Raises:
+        ValidationError: If format is invalid
+    """
+    if not reminder_strings:
+        return None
+
+    # Check for "default" special case
+    if reminder_strings == ["default"]:
+        return {"useDefault": True}
+
+    # Parse custom reminders
+    overrides = []
+    for reminder_str in reminder_strings:
+        parts = reminder_str.split(":")
+        if len(parts) != 2:
+            raise ValidationError(
+                f"Invalid reminder format: '{reminder_str}'. "
+                f"Expected 'method:minutes' (e.g., 'popup:10', 'email:1440')"
+            )
+
+        method, minutes_str = parts
+        method = method.strip().lower()
+
+        if method not in ("popup", "email"):
+            raise ValidationError(
+                f"Invalid reminder method: '{method}'. Must be 'popup' or 'email'"
+            )
+
+        try:
+            minutes = int(minutes_str.strip())
+        except ValueError:
+            raise ValidationError(f"Invalid minutes value: '{minutes_str}'. Must be an integer")
+
+        if minutes < 0 or minutes > 40320:  # 40320 = 4 weeks in minutes
+            raise ValidationError(
+                f"Minutes must be between 0 and 40320 (4 weeks), got {minutes}"
+            )
+
+        overrides.append({"method": method, "minutes": minutes})
+
+    if not overrides:
+        return None
+
+    return {"useDefault": False, "overrides": overrides}
+
+
 def validate_iso8601(timestamp: str) -> datetime:
     """Validate and parse ISO8601 timestamp.
 
@@ -97,6 +153,7 @@ def create_event(
     location: Optional[str] = None,
     transparency: Optional[str] = None,
     visibility: Optional[str] = None,
+    reminders: Optional[List[str]] = None,
     send_updates: Optional[str] = None,
     calendar_id: str = "primary"
 ) -> Dict[str, Any]:
@@ -112,6 +169,7 @@ def create_event(
         location: Event location (freeform text or address)
         transparency: "opaque" (busy) or "transparent" (free)
         visibility: "default", "public", "private", or "confidential"
+        reminders: List of "method:minutes" strings (e.g., ["popup:10", "email:1440"]) or ["default"]
         send_updates: "all", "externalOnly", or "none" - notify guests
         calendar_id: Calendar ID (default "primary")
 
@@ -182,6 +240,12 @@ def create_event(
                 }
             }
         }
+
+    # Parse and add reminders
+    if reminders:
+        reminders_obj = parse_reminders(reminders)
+        if reminders_obj:
+            event['reminders'] = reminders_obj
 
     # Create event
     service = build_calendar_service()
@@ -334,6 +398,7 @@ def update_event(
     location: Optional[str] = None,
     transparency: Optional[str] = None,
     visibility: Optional[str] = None,
+    reminders: Optional[List[str]] = None,
     send_updates: Optional[str] = None,
     calendar_id: str = "primary"
 ) -> Dict[str, Any]:
@@ -350,6 +415,7 @@ def update_event(
         location: Event location (freeform text or address)
         transparency: "opaque" (busy) or "transparent" (free)
         visibility: "default", "public", "private", or "confidential"
+        reminders: List of "method:minutes" strings or ["default"]
         send_updates: "all", "externalOnly", or "none" - notify guests
         calendar_id: Calendar ID (default "primary")
 
@@ -415,6 +481,12 @@ def update_event(
                 }
             }
         }
+
+    # Parse and add reminders
+    if reminders:
+        reminders_obj = parse_reminders(reminders)
+        if reminders_obj:
+            event['reminders'] = reminders_obj
 
     # Perform update
     try:
