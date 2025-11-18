@@ -215,8 +215,7 @@ def list(output):
 )
 @click.option(
     '--reminder',
-    multiple=True,
-    help='Set reminders: "method:minutes" (e.g., "popup:10" or "email:1440") or "default"'
+    help='Set reminders (comma-separated): "method:minutes" (e.g., "popup:10,email:1440") or "default"'
 )
 @click.option(
     '--calendar',
@@ -248,6 +247,11 @@ def create(time, subject, duration, attendees, description, meet, location, tran
         if description_file:
             final_description = description_file.read()
 
+        # Parse reminders (comma-separated list)
+        reminder_list = None
+        if reminder:
+            reminder_list = [r.strip() for r in reminder.split(',')]
+
         event = operations.create_event(
             subject=subject,
             start_time=time,
@@ -258,7 +262,7 @@ def create(time, subject, duration, attendees, description, meet, location, tran
             location=location,
             transparency=transparency,
             visibility=visibility,
-            reminders=list(reminder) if reminder else None,
+            reminders=reminder_list,
             send_updates=notify,
             calendar_id=calendar
         )
@@ -372,8 +376,7 @@ def get(event_id, calendar, output):
 )
 @click.option(
     '--reminder',
-    multiple=True,
-    help='Set reminders: "method:minutes" (e.g., "popup:10" or "email:1440") or "default"'
+    help='Set reminders (comma-separated): "method:minutes" (e.g., "popup:10,email:1440") or "default"'
 )
 @click.option(
     '--calendar',
@@ -429,6 +432,11 @@ def update(event_id, time, subject, duration, attendees, description, meet, loca
         if description_file:
             final_description = description_file.read()
 
+        # Parse reminders (comma-separated list)
+        reminder_list = None
+        if reminder:
+            reminder_list = [r.strip() for r in reminder.split(',')]
+
         event = operations.update_event(
             event_id=event_id,
             subject=subject,
@@ -440,7 +448,7 @@ def update(event_id, time, subject, duration, attendees, description, meet, loca
             location=location,
             transparency=transparency,
             visibility=visibility,
-            reminders=list(reminder) if reminder else None,
+            reminders=reminder_list,
             send_updates=notify,
             calendar_id=calendar
         )
