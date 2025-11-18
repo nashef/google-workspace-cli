@@ -83,15 +83,16 @@ def authenticate_interactive(scopes: Optional[list] = None) -> Credentials:
             except Exception as e:
                 raise AuthenticationError(f"Failed to exchange code for token: {e}")
 
-        # Save the token
-        config.save_token({
-            'token': creds.get('access_token') or getattr(creds, 'token', None),
-            'refresh_token': creds.get('refresh_token') or getattr(creds, 'refresh_token', None),
-            'token_uri': creds.get('token_uri') or getattr(creds, 'token_uri', None),
-            'client_id': creds.get('client_id') or getattr(creds, 'client_id', None),
-            'client_secret': creds.get('client_secret') or getattr(creds, 'client_secret', None),
+        # Save the token - handle both Credentials objects and dicts
+        token_data = {
+            'token': getattr(creds, 'token', None),
+            'refresh_token': getattr(creds, 'refresh_token', None),
+            'token_uri': getattr(creds, 'token_uri', None),
+            'client_id': getattr(creds, 'client_id', None),
+            'client_secret': getattr(creds, 'client_secret', None),
             'scopes': scopes
-        })
+        }
+        config.save_token(token_data)
 
         return creds
 
