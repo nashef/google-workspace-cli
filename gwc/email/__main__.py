@@ -23,8 +23,24 @@ from gwc.email.operations import (
     delete_draft,
     reply_to_message,
     forward_message,
+    # Phase 3: Message organization & batch operations
+    create_label,
+    add_label_to_message,
+    remove_label_from_message,
+    set_message_read,
+    set_message_unread,
+    archive_message,
+    unarchive_message,
+    mark_message_spam,
+    permanently_delete_message,
+    batch_add_label,
+    batch_remove_label,
+    batch_set_read,
+    batch_set_unread,
+    batch_archive,
+    batch_delete,
 )
-from gwc.shared.output import format_output
+from gwc.shared.output import format_output, OutputFormat
 
 
 @click.group()
@@ -101,7 +117,7 @@ def list(label: str, limit: int, query: str, output: str, page_token: Optional[s
                 }
             )
 
-        click.echo(format_output(data, output))
+        click.echo(format_output(data, OutputFormat(output)))
 
         # Show pagination info
         if "nextPageToken" in results:
@@ -128,7 +144,7 @@ def get(message_id: str, output: str):
     try:
         message = get_message(message_id)
         formatted = format_message_for_display(message)
-        click.echo(format_output([formatted], output))
+        click.echo(format_output([formatted], OutputFormat(output)))
     except Exception as e:
         click.echo(f"Error getting message: {e}", err=True)
         raise click.Abort()
@@ -174,7 +190,7 @@ def search(query: str, limit: int, output: str):
                 }
             )
 
-        click.echo(format_output(data, output))
+        click.echo(format_output(data, OutputFormat(output)))
 
     except Exception as e:
         click.echo(f"Error searching: {e}", err=True)
@@ -231,7 +247,7 @@ def labels_list(output: str):
                 }
             )
 
-        click.echo(format_output(data, output))
+        click.echo(format_output(data, OutputFormat(output)))
 
     except Exception as e:
         click.echo(f"Error listing labels: {e}", err=True)
@@ -266,7 +282,7 @@ def labels_get(label_name: str, output: str):
             }
         ]
 
-        click.echo(format_output(data, output))
+        click.echo(format_output(data, OutputFormat(output)))
 
     except Exception as e:
         click.echo(f"Error getting label: {e}", err=True)
@@ -292,7 +308,7 @@ def labels_map(output: str):
         # Format for output
         data = [{"name": name, "id": label_id} for name, label_id in sorted(label_map.items())]
 
-        click.echo(format_output(data, output))
+        click.echo(format_output(data, OutputFormat(output)))
 
     except Exception as e:
         click.echo(f"Error mapping labels: {e}", err=True)
@@ -328,7 +344,7 @@ def thread(thread_id: str, output: str):
                 }
             )
 
-        click.echo(format_output(data, output))
+        click.echo(format_output(data, OutputFormat(output)))
 
     except Exception as e:
         click.echo(f"Error getting thread: {e}", err=True)
@@ -429,7 +445,7 @@ def draft_list(limit: int, output: str):
                 }
             )
 
-        click.echo(format_output(data, output))
+        click.echo(format_output(data, OutputFormat(output)))
 
     except Exception as e:
         click.echo(f"Error listing drafts: {e}", err=True)
@@ -460,7 +476,7 @@ def draft_get(draft_id: str, output: str):
             }
         ]
 
-        click.echo(format_output(data, output))
+        click.echo(format_output(data, OutputFormat(output)))
 
     except Exception as e:
         click.echo(f"Error getting draft: {e}", err=True)
@@ -527,6 +543,323 @@ def forward(message_id: str, to: str, subject: str, body: str):
         click.echo(f"Message forwarded! ID: {message_id}")
     except Exception as e:
         click.echo(f"Error forwarding message: {e}", err=True)
+        raise click.Abort()
+
+
+# ============================================================================
+# Message Organization & Batch Operations (Phase 3)
+# ============================================================================
+
+
+@main.command()
+@click.argument("label_name")
+@click.option(
+    "--visibility",
+    type=click.Choice(["show", "hide"]),
+    default="show",
+    help="Show or hide label in label list",
+)
+def create_label_cmd(label_name: str, visibility: str):
+    """Create a new label.
+
+    Examples:
+        gwc-email create-label "Project X"
+        gwc-email create-label "To Review" --visibility hide
+    """
+    try:
+        visibility_map = {"show": "labelShow", "hide": "labelHide"}
+        label_id = create_label(label_name, visibility_map[visibility])
+        click.echo(f"Label created! ID: {label_id}")
+    except Exception as e:
+        click.echo(f"Error creating label: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("message_id")
+@click.argument("label_name")
+def add_label(message_id: str, label_name: str):
+    """Add a label to a message.
+
+    Examples:
+        gwc-email add-label msg123 "Important"
+        gwc-email add-label msg123 "Project X"
+    """
+    try:
+        add_label_to_message(message_id, label_name)
+        click.echo(f"Label '{label_name}' added to message {message_id}")
+    except ValueError as e:
+        click.echo(f"Error: {e}", err=True)
+        raise click.Abort()
+    except Exception as e:
+        click.echo(f"Error adding label: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("message_id")
+@click.argument("label_name")
+def remove_label(message_id: str, label_name: str):
+    """Remove a label from a message.
+
+    Examples:
+        gwc-email remove-label msg123 "Important"
+        gwc-email remove-label msg123 "Project X"
+    """
+    try:
+        remove_label_from_message(message_id, label_name)
+        click.echo(f"Label '{label_name}' removed from message {message_id}")
+    except ValueError as e:
+        click.echo(f"Error: {e}", err=True)
+        raise click.Abort()
+    except Exception as e:
+        click.echo(f"Error removing label: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("message_id")
+def mark_read(message_id: str):
+    """Mark a message as read.
+
+    Examples:
+        gwc-email mark-read msg123
+    """
+    try:
+        set_message_read(message_id)
+        click.echo(f"Message {message_id} marked as read")
+    except Exception as e:
+        click.echo(f"Error marking message as read: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("message_id")
+def mark_unread(message_id: str):
+    """Mark a message as unread.
+
+    Examples:
+        gwc-email mark-unread msg123
+    """
+    try:
+        set_message_unread(message_id)
+        click.echo(f"Message {message_id} marked as unread")
+    except Exception as e:
+        click.echo(f"Error marking message as unread: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("message_id")
+def archive(message_id: str):
+    """Archive a message (remove from INBOX).
+
+    Examples:
+        gwc-email archive msg123
+    """
+    try:
+        archive_message(message_id)
+        click.echo(f"Message {message_id} archived")
+    except Exception as e:
+        click.echo(f"Error archiving message: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("message_id")
+def unarchive(message_id: str):
+    """Restore a message to INBOX.
+
+    Examples:
+        gwc-email unarchive msg123
+    """
+    try:
+        unarchive_message(message_id)
+        click.echo(f"Message {message_id} restored to inbox")
+    except Exception as e:
+        click.echo(f"Error unarchiving message: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("message_id")
+def spam(message_id: str):
+    """Mark a message as spam.
+
+    Examples:
+        gwc-email spam msg123
+    """
+    try:
+        mark_message_spam(message_id)
+        click.echo(f"Message {message_id} marked as spam")
+    except Exception as e:
+        click.echo(f"Error marking message as spam: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("message_id")
+@click.option("--confirm", is_flag=True, help="Confirm deletion without prompting")
+def delete(message_id: str, confirm: bool):
+    """Permanently delete a message.
+
+    Examples:
+        gwc-email delete msg123 --confirm
+    """
+    try:
+        if not confirm:
+            if not click.confirm(f"Permanently delete message {message_id}?"):
+                click.echo("Cancelled.")
+                return
+        permanently_delete_message(message_id)
+        click.echo(f"Message {message_id} deleted permanently")
+    except Exception as e:
+        click.echo(f"Error deleting message: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("message_ids", nargs=-1, required=True)
+@click.argument("label_name")
+@click.option(
+    "--output",
+    type=click.Choice(["unix", "json", "llm"]),
+    default="unix",
+    help="Output format",
+)
+def batch_add_label_cmd(message_ids, label_name: str, output: str):
+    """Add a label to multiple messages.
+
+    Examples:
+        gwc-email batch-add-label msg1 msg2 msg3 "Project X"
+    """
+    try:
+        result = batch_add_label(list(message_ids), label_name)
+        click.echo(format_output([result], output))
+    except ValueError as e:
+        click.echo(f"Error: {e}", err=True)
+        raise click.Abort()
+    except Exception as e:
+        click.echo(f"Error in batch operation: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("message_ids", nargs=-1, required=True)
+@click.argument("label_name")
+@click.option(
+    "--output",
+    type=click.Choice(["unix", "json", "llm"]),
+    default="unix",
+    help="Output format",
+)
+def batch_remove_label_cmd(message_ids, label_name: str, output: str):
+    """Remove a label from multiple messages.
+
+    Examples:
+        gwc-email batch-remove-label msg1 msg2 msg3 "Project X"
+    """
+    try:
+        result = batch_remove_label(list(message_ids), label_name)
+        click.echo(format_output([result], output))
+    except ValueError as e:
+        click.echo(f"Error: {e}", err=True)
+        raise click.Abort()
+    except Exception as e:
+        click.echo(f"Error in batch operation: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("message_ids", nargs=-1, required=True)
+@click.option(
+    "--output",
+    type=click.Choice(["unix", "json", "llm"]),
+    default="unix",
+    help="Output format",
+)
+def batch_mark_read(message_ids, output: str):
+    """Mark multiple messages as read.
+
+    Examples:
+        gwc-email batch-mark-read msg1 msg2 msg3
+    """
+    try:
+        result = batch_set_read(list(message_ids))
+        click.echo(format_output([result], output))
+    except Exception as e:
+        click.echo(f"Error in batch operation: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("message_ids", nargs=-1, required=True)
+@click.option(
+    "--output",
+    type=click.Choice(["unix", "json", "llm"]),
+    default="unix",
+    help="Output format",
+)
+def batch_mark_unread(message_ids, output: str):
+    """Mark multiple messages as unread.
+
+    Examples:
+        gwc-email batch-mark-unread msg1 msg2 msg3
+    """
+    try:
+        result = batch_set_unread(list(message_ids))
+        click.echo(format_output([result], output))
+    except Exception as e:
+        click.echo(f"Error in batch operation: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("message_ids", nargs=-1, required=True)
+@click.option(
+    "--output",
+    type=click.Choice(["unix", "json", "llm"]),
+    default="unix",
+    help="Output format",
+)
+def batch_archive_cmd(message_ids, output: str):
+    """Archive multiple messages.
+
+    Examples:
+        gwc-email batch-archive msg1 msg2 msg3
+    """
+    try:
+        result = batch_archive(list(message_ids))
+        click.echo(format_output([result], output))
+    except Exception as e:
+        click.echo(f"Error in batch operation: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("message_ids", nargs=-1, required=True)
+@click.option("--confirm", is_flag=True, help="Confirm deletion without prompting")
+@click.option(
+    "--output",
+    type=click.Choice(["unix", "json", "llm"]),
+    default="unix",
+    help="Output format",
+)
+def batch_delete_cmd(message_ids, confirm: bool, output: str):
+    """Permanently delete multiple messages.
+
+    Examples:
+        gwc-email batch-delete msg1 msg2 msg3 --confirm
+    """
+    try:
+        if not confirm:
+            if not click.confirm(f"Permanently delete {len(message_ids)} messages?"):
+                click.echo("Cancelled.")
+                return
+        result = batch_delete(list(message_ids))
+        click.echo(format_output([result], output))
+    except Exception as e:
+        click.echo(f"Error in batch operation: {e}", err=True)
         raise click.Abort()
 
 

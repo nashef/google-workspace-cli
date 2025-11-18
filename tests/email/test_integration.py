@@ -280,3 +280,133 @@ class TestReplyForwardCommands:
             ["forward", "--to", "alice@example.com"],
         )
         assert result.exit_code != 0
+
+
+# ============================================================================
+# Phase 3: Message Organization & Batch Operations Tests
+# ============================================================================
+
+
+class TestLabelCommands:
+    """Test label-related commands."""
+
+    def test_create_label_help(self, runner):
+        """Test create-label command help."""
+        result = runner.invoke(email_cli.main, ["create-label", "--help"])
+        assert result.exit_code == 0
+        assert "Create a new label" in result.output
+
+    def test_add_label_help(self, runner):
+        """Test add-label command help."""
+        result = runner.invoke(email_cli.main, ["add-label", "--help"])
+        assert result.exit_code == 0
+        assert "Add a label to a message" in result.output
+
+    def test_remove_label_help(self, runner):
+        """Test remove-label command help."""
+        result = runner.invoke(email_cli.main, ["remove-label", "--help"])
+        assert result.exit_code == 0
+        assert "Remove a label from a message" in result.output
+
+
+class TestReadUnreadCommands:
+    """Test read/unread status commands."""
+
+    def test_mark_read_help(self, runner):
+        """Test mark-read command help."""
+        result = runner.invoke(email_cli.main, ["mark-read", "--help"])
+        assert result.exit_code == 0
+        assert "Mark a message as read" in result.output
+
+    def test_mark_unread_help(self, runner):
+        """Test mark-unread command help."""
+        result = runner.invoke(email_cli.main, ["mark-unread", "--help"])
+        assert result.exit_code == 0
+        assert "Mark a message as unread" in result.output
+
+
+class TestArchiveCommands:
+    """Test archive-related commands."""
+
+    def test_archive_help(self, runner):
+        """Test archive command help."""
+        result = runner.invoke(email_cli.main, ["archive", "--help"])
+        assert result.exit_code == 0
+        assert "Archive a message" in result.output
+
+    def test_unarchive_help(self, runner):
+        """Test unarchive command help."""
+        result = runner.invoke(email_cli.main, ["unarchive", "--help"])
+        assert result.exit_code == 0
+        assert "Restore a message to INBOX" in result.output
+
+
+class TestSpamDeleteCommands:
+    """Test spam and delete commands."""
+
+    def test_spam_help(self, runner):
+        """Test spam command help."""
+        result = runner.invoke(email_cli.main, ["spam", "--help"])
+        assert result.exit_code == 0
+        assert "Mark a message as spam" in result.output
+
+    def test_delete_help(self, runner):
+        """Test delete command help."""
+        result = runner.invoke(email_cli.main, ["delete", "--help"])
+        assert result.exit_code == 0
+        assert "Permanently delete a message" in result.output
+
+    def test_delete_missing_message_id(self, runner):
+        """Test delete without message ID."""
+        result = runner.invoke(email_cli.main, ["delete"])
+        assert result.exit_code != 0
+
+
+class TestBatchCommands:
+    """Test batch operation commands."""
+
+    def test_batch_add_label_help(self, runner):
+        """Test batch-add-label command help."""
+        result = runner.invoke(email_cli.main, ["batch-add-label", "--help"])
+        assert result.exit_code == 0
+        assert "Add a label to multiple messages" in result.output
+
+    def test_batch_remove_label_help(self, runner):
+        """Test batch-remove-label command help."""
+        result = runner.invoke(email_cli.main, ["batch-remove-label", "--help"])
+        assert result.exit_code == 0
+        assert "Remove a label from multiple messages" in result.output
+
+    def test_batch_mark_read_help(self, runner):
+        """Test batch-mark-read command help."""
+        result = runner.invoke(email_cli.main, ["batch-mark-read", "--help"])
+        assert result.exit_code == 0
+        assert "Mark multiple messages as read" in result.output
+
+    def test_batch_mark_unread_help(self, runner):
+        """Test batch-mark-unread command help."""
+        result = runner.invoke(email_cli.main, ["batch-mark-unread", "--help"])
+        assert result.exit_code == 0
+        assert "Mark multiple messages as unread" in result.output
+
+    def test_batch_archive_help(self, runner):
+        """Test batch-archive command help."""
+        result = runner.invoke(email_cli.main, ["batch-archive", "--help"])
+        assert result.exit_code == 0
+        assert "Archive multiple messages" in result.output
+
+    def test_batch_delete_help(self, runner):
+        """Test batch-delete command help."""
+        result = runner.invoke(email_cli.main, ["batch-delete", "--help"])
+        assert result.exit_code == 0
+        assert "Permanently delete multiple messages" in result.output
+
+    def test_batch_commands_missing_ids(self, runner):
+        """Test batch commands without message IDs."""
+        result = runner.invoke(email_cli.main, ["batch-mark-read"])
+        assert result.exit_code != 0
+
+    def test_batch_add_label_missing_label(self, runner):
+        """Test batch-add-label without label name."""
+        result = runner.invoke(email_cli.main, ["batch-add-label", "msg1"])
+        assert result.exit_code != 0

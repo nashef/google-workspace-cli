@@ -374,3 +374,277 @@ class TestForwardMessage:
 
         assert result == "forward_msg_id"
         assert mock_get_message.called
+
+
+# ============================================================================
+# Phase 3: Message Organization & Batch Operations Tests
+# ============================================================================
+
+
+class TestLabelOperations:
+    """Test label creation and modification."""
+
+    @patch("gwc.email.operations.build_email_service")
+    def test_create_label(self, mock_service):
+        """Test creating a new label."""
+        from gwc.email.operations import create_label
+
+        mock_create = MagicMock(return_value={"id": "label_123"})
+        mock_service.return_value.users().labels().create.return_value = mock_create
+        mock_create.execute.return_value = {"id": "label_123"}
+
+        result = create_label("Project X")
+
+        assert result == "label_123"
+        mock_service.return_value.users().labels().create.assert_called_once()
+
+    @patch("gwc.email.operations.resolve_label_name_to_id")
+    @patch("gwc.email.operations.build_email_service")
+    def test_add_label_to_message(self, mock_service, mock_resolve):
+        """Test adding a label to a message."""
+        from gwc.email.operations import add_label_to_message
+
+        mock_resolve.return_value = "label_123"
+        mock_modify = MagicMock()
+        mock_service.return_value.users().messages().modify.return_value = mock_modify
+        mock_modify.execute.return_value = {}
+
+        add_label_to_message("msg123", "Project X")
+
+        mock_service.return_value.users().messages().modify.assert_called_once()
+
+    @patch("gwc.email.operations.resolve_label_name_to_id")
+    def test_add_label_not_found(self, mock_resolve):
+        """Test adding non-existent label raises error."""
+        from gwc.email.operations import add_label_to_message
+
+        mock_resolve.return_value = None
+
+        with pytest.raises(ValueError):
+            add_label_to_message("msg123", "NonExistent")
+
+    @patch("gwc.email.operations.resolve_label_name_to_id")
+    @patch("gwc.email.operations.build_email_service")
+    def test_remove_label_from_message(self, mock_service, mock_resolve):
+        """Test removing a label from a message."""
+        from gwc.email.operations import remove_label_from_message
+
+        mock_resolve.return_value = "label_123"
+        mock_modify = MagicMock()
+        mock_service.return_value.users().messages().modify.return_value = mock_modify
+        mock_modify.execute.return_value = {}
+
+        remove_label_from_message("msg123", "Project X")
+
+        mock_service.return_value.users().messages().modify.assert_called_once()
+
+
+class TestReadUnreadOperations:
+    """Test read/unread status management."""
+
+    @patch("gwc.email.operations.build_email_service")
+    def test_set_message_read(self, mock_service):
+        """Test marking a message as read."""
+        from gwc.email.operations import set_message_read
+
+        mock_modify = MagicMock()
+        mock_service.return_value.users().messages().modify.return_value = mock_modify
+        mock_modify.execute.return_value = {}
+
+        set_message_read("msg123")
+
+        mock_service.return_value.users().messages().modify.assert_called_once()
+
+    @patch("gwc.email.operations.build_email_service")
+    def test_set_message_unread(self, mock_service):
+        """Test marking a message as unread."""
+        from gwc.email.operations import set_message_unread
+
+        mock_modify = MagicMock()
+        mock_service.return_value.users().messages().modify.return_value = mock_modify
+        mock_modify.execute.return_value = {}
+
+        set_message_unread("msg123")
+
+        mock_service.return_value.users().messages().modify.assert_called_once()
+
+
+class TestArchiveOperations:
+    """Test archive/unarchive operations."""
+
+    @patch("gwc.email.operations.build_email_service")
+    def test_archive_message(self, mock_service):
+        """Test archiving a message."""
+        from gwc.email.operations import archive_message
+
+        mock_modify = MagicMock()
+        mock_service.return_value.users().messages().modify.return_value = mock_modify
+        mock_modify.execute.return_value = {}
+
+        archive_message("msg123")
+
+        mock_service.return_value.users().messages().modify.assert_called_once()
+
+    @patch("gwc.email.operations.build_email_service")
+    def test_unarchive_message(self, mock_service):
+        """Test restoring archived message to inbox."""
+        from gwc.email.operations import unarchive_message
+
+        mock_modify = MagicMock()
+        mock_service.return_value.users().messages().modify.return_value = mock_modify
+        mock_modify.execute.return_value = {}
+
+        unarchive_message("msg123")
+
+        mock_service.return_value.users().messages().modify.assert_called_once()
+
+
+class TestSpamOperations:
+    """Test spam marking."""
+
+    @patch("gwc.email.operations.build_email_service")
+    def test_mark_message_spam(self, mock_service):
+        """Test marking a message as spam."""
+        from gwc.email.operations import mark_message_spam
+
+        mock_modify = MagicMock()
+        mock_service.return_value.users().messages().modify.return_value = mock_modify
+        mock_modify.execute.return_value = {}
+
+        mark_message_spam("msg123")
+
+        mock_service.return_value.users().messages().modify.assert_called_once()
+
+
+class TestDeleteOperations:
+    """Test message deletion."""
+
+    @patch("gwc.email.operations.build_email_service")
+    def test_permanently_delete_message(self, mock_service):
+        """Test permanently deleting a message."""
+        from gwc.email.operations import permanently_delete_message
+
+        mock_delete = MagicMock()
+        mock_service.return_value.users().messages().delete.return_value = mock_delete
+        mock_delete.execute.return_value = {}
+
+        permanently_delete_message("msg123")
+
+        mock_service.return_value.users().messages().delete.assert_called_once()
+
+
+class TestBatchOperations:
+    """Test batch operations on multiple messages."""
+
+    @patch("gwc.email.operations.resolve_label_name_to_id")
+    @patch("gwc.email.operations.build_email_service")
+    def test_batch_add_label(self, mock_service, mock_resolve):
+        """Test adding label to multiple messages."""
+        from gwc.email.operations import batch_add_label
+
+        mock_resolve.return_value = "label_123"
+        mock_modify = MagicMock()
+        mock_service.return_value.users().messages().modify.return_value = mock_modify
+        mock_modify.execute.return_value = {}
+
+        result = batch_add_label(["msg1", "msg2", "msg3"], "Project X")
+
+        assert result["success_count"] == 3
+        assert result["failure_count"] == 0
+        assert len(result["errors"]) == 0
+
+    @patch("gwc.email.operations.resolve_label_name_to_id")
+    @patch("gwc.email.operations.build_email_service")
+    def test_batch_add_label_with_failures(self, mock_service, mock_resolve):
+        """Test batch add with some failures."""
+        from gwc.email.operations import batch_add_label
+
+        mock_resolve.return_value = "label_123"
+        mock_modify = MagicMock()
+        mock_service.return_value.users().messages().modify.return_value = mock_modify
+
+        # First call succeeds, second fails, third succeeds
+        mock_modify.execute.side_effect = [
+            {},
+            Exception("API Error"),
+            {},
+        ]
+
+        result = batch_add_label(["msg1", "msg2", "msg3"], "Project X")
+
+        assert result["success_count"] == 2
+        assert result["failure_count"] == 1
+        assert len(result["errors"]) == 1
+
+    @patch("gwc.email.operations.resolve_label_name_to_id")
+    @patch("gwc.email.operations.build_email_service")
+    def test_batch_remove_label(self, mock_service, mock_resolve):
+        """Test removing label from multiple messages."""
+        from gwc.email.operations import batch_remove_label
+
+        mock_resolve.return_value = "label_123"
+        mock_modify = MagicMock()
+        mock_service.return_value.users().messages().modify.return_value = mock_modify
+        mock_modify.execute.return_value = {}
+
+        result = batch_remove_label(["msg1", "msg2"], "Project X")
+
+        assert result["success_count"] == 2
+        assert result["failure_count"] == 0
+
+    @patch("gwc.email.operations.build_email_service")
+    def test_batch_set_read(self, mock_service):
+        """Test marking multiple messages as read."""
+        from gwc.email.operations import batch_set_read
+
+        mock_modify = MagicMock()
+        mock_service.return_value.users().messages().modify.return_value = mock_modify
+        mock_modify.execute.return_value = {}
+
+        result = batch_set_read(["msg1", "msg2", "msg3"])
+
+        assert result["success_count"] == 3
+        assert result["failure_count"] == 0
+
+    @patch("gwc.email.operations.build_email_service")
+    def test_batch_set_unread(self, mock_service):
+        """Test marking multiple messages as unread."""
+        from gwc.email.operations import batch_set_unread
+
+        mock_modify = MagicMock()
+        mock_service.return_value.users().messages().modify.return_value = mock_modify
+        mock_modify.execute.return_value = {}
+
+        result = batch_set_unread(["msg1", "msg2"])
+
+        assert result["success_count"] == 2
+        assert result["failure_count"] == 0
+
+    @patch("gwc.email.operations.build_email_service")
+    def test_batch_archive(self, mock_service):
+        """Test archiving multiple messages."""
+        from gwc.email.operations import batch_archive
+
+        mock_modify = MagicMock()
+        mock_service.return_value.users().messages().modify.return_value = mock_modify
+        mock_modify.execute.return_value = {}
+
+        result = batch_archive(["msg1", "msg2", "msg3"])
+
+        assert result["success_count"] == 3
+        assert result["failure_count"] == 0
+
+    @patch("gwc.email.operations.build_email_service")
+    def test_batch_delete(self, mock_service):
+        """Test permanently deleting multiple messages."""
+        from gwc.email.operations import batch_delete
+
+        mock_delete = MagicMock()
+        mock_service.return_value.users().messages().delete.return_value = mock_delete
+        mock_delete.execute.return_value = {}
+
+        result = batch_delete(["msg1", "msg2", "msg3", "msg4"])
+
+        assert result["success_count"] == 4
+        assert result["failure_count"] == 0
+        assert mock_service.return_value.users().messages().delete.call_count == 4

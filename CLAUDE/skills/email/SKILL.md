@@ -1,7 +1,15 @@
 ---
 name: email
-description: Gmail management and email operations
+description: Gmail management and email operations (Phases 1-3 complete)
 ---
+
+## Status
+
+✅ **Phase 1**: Message reading, searching, and label management
+✅ **Phase 2**: Message composition, drafts, send, reply, forward with attachments
+✅ **Phase 3**: Message organization (read/unread, archive, labels) and batch operations
+
+All core email functionality is fully implemented and tested.
 
 ## Quick Start
 
@@ -175,10 +183,27 @@ poetry run gwc-email labels --help
 - `reply` - Reply to a message
 - `forward` - Forward message to recipient
 
-**Labels & Organization:**
+**Labels & Organization (Phase 1):**
 - `labels list` - List all labels
 - `labels get` - Get label details
 - `labels map` - Show name→ID mapping
+
+**Message Organization & Batch Operations (Phase 3):**
+- `create-label` - Create new label
+- `add-label` - Add label to message
+- `remove-label` - Remove label from message
+- `mark-read` - Mark message as read
+- `mark-unread` - Mark message as unread
+- `archive` - Archive message (remove from INBOX)
+- `unarchive` - Restore message to INBOX
+- `spam` - Mark message as spam
+- `delete` - Permanently delete message
+- `batch-add-label` - Add label to multiple messages
+- `batch-remove-label` - Remove label from multiple messages
+- `batch-mark-read` - Mark multiple messages as read
+- `batch-mark-unread` - Mark multiple messages as unread
+- `batch-archive` - Archive multiple messages
+- `batch-delete` - Permanently delete multiple messages
 
 **Help & Reference:**
 - `search-help` - Show search query examples
@@ -289,6 +314,68 @@ poetry run gwc-email forward msg123 --to alice@example.com --body "This is impor
 
 # Forward with custom subject
 poetry run gwc-email forward msg123 --to alice@example.com --subject "FYI: Project Update"
+```
+
+## Message Organization (Phase 3)
+
+### Create and Manage Labels
+```bash
+# Create a new label
+poetry run gwc-email create-label "Project X"
+
+# Create hidden label
+poetry run gwc-email create-label "To Review" --visibility hide
+
+# Add label to message
+poetry run gwc-email add-label msg123 "Project X"
+
+# Remove label from message
+poetry run gwc-email remove-label msg123 "Project X"
+```
+
+### Mark Messages as Read/Unread
+```bash
+# Mark single message as read
+poetry run gwc-email mark-read msg123
+
+# Mark single message as unread
+poetry run gwc-email mark-unread msg123
+
+# Mark multiple messages as read
+poetry run gwc-email batch-mark-read msg1 msg2 msg3
+
+# Mark multiple messages as unread
+poetry run gwc-email batch-mark-unread msg1 msg2 msg3
+```
+
+### Archive and Delete Messages
+```bash
+# Archive a message (remove from INBOX)
+poetry run gwc-email archive msg123
+
+# Restore archived message to INBOX
+poetry run gwc-email unarchive msg123
+
+# Mark message as spam
+poetry run gwc-email spam msg123
+
+# Permanently delete a message
+poetry run gwc-email delete msg123 --confirm
+
+# Archive multiple messages
+poetry run gwc-email batch-archive msg1 msg2 msg3
+
+# Permanently delete multiple messages
+poetry run gwc-email batch-delete msg1 msg2 msg3 --confirm
+```
+
+### Batch Label Operations
+```bash
+# Add label to multiple messages
+poetry run gwc-email batch-add-label msg1 msg2 msg3 "Project X"
+
+# Remove label from multiple messages
+poetry run gwc-email batch-remove-label msg1 msg2 msg3 "Project X"
 ```
 
 ## Tips & Tricks

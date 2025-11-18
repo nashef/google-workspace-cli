@@ -639,3 +639,380 @@ def forward_message(
     ).execute()
 
     return result.get("id", "")
+
+
+# ============================================================================
+# Message Organization & Batch Operations (Phase 3)
+# ============================================================================
+
+
+def create_label(name: str, labelListVisibility: str = "labelShow") -> str:
+    """Create a new label.
+
+    Args:
+        name: Label name (e.g., "Project X")
+        labelListVisibility: "labelShow" (default) or "labelHide"
+
+    Returns:
+        Label ID of the created label
+    """
+    service = build_email_service()
+
+    label_object = {
+        "name": name,
+        "labelListVisibility": labelListVisibility,
+    }
+
+    result = service.users().labels().create(userId="me", body=label_object).execute()
+
+    return result.get("id", "")
+
+
+def add_label_to_message(message_id: str, label_name: str) -> None:
+    """Add a label to a message.
+
+    Args:
+        message_id: Message ID
+        label_name: Label name (e.g., "Important", "Project X")
+    """
+    service = build_email_service()
+
+    # Resolve label name to ID
+    label_id = resolve_label_name_to_id(label_name)
+    if not label_id:
+        raise ValueError(f"Label '{label_name}' not found")
+
+    # Get current labels
+    message = get_message(message_id)
+    current_labels = message.get("labelIds", [])
+
+    # Add new label if not already present
+    if label_id not in current_labels:
+        current_labels.append(label_id)
+
+    # Update message with new labels
+    service.users().messages().modify(
+        userId="me",
+        id=message_id,
+        body={"addLabelIds": [label_id]},
+    ).execute()
+
+
+def remove_label_from_message(message_id: str, label_name: str) -> None:
+    """Remove a label from a message.
+
+    Args:
+        message_id: Message ID
+        label_name: Label name (e.g., "Important", "Project X")
+    """
+    service = build_email_service()
+
+    # Resolve label name to ID
+    label_id = resolve_label_name_to_id(label_name)
+    if not label_id:
+        raise ValueError(f"Label '{label_name}' not found")
+
+    # Remove label
+    service.users().messages().modify(
+        userId="me",
+        id=message_id,
+        body={"removeLabelIds": [label_id]},
+    ).execute()
+
+
+def set_message_read(message_id: str) -> None:
+    """Mark a message as read.
+
+    Args:
+        message_id: Message ID
+    """
+    service = build_email_service()
+
+    service.users().messages().modify(
+        userId="me",
+        id=message_id,
+        body={"removeLabelIds": ["UNREAD"]},
+    ).execute()
+
+
+def set_message_unread(message_id: str) -> None:
+    """Mark a message as unread.
+
+    Args:
+        message_id: Message ID
+    """
+    service = build_email_service()
+
+    service.users().messages().modify(
+        userId="me",
+        id=message_id,
+        body={"addLabelIds": ["UNREAD"]},
+    ).execute()
+
+
+def archive_message(message_id: str) -> None:
+    """Archive a message (remove from INBOX).
+
+    Args:
+        message_id: Message ID
+    """
+    service = build_email_service()
+
+    service.users().messages().modify(
+        userId="me",
+        id=message_id,
+        body={"removeLabelIds": ["INBOX"]},
+    ).execute()
+
+
+def unarchive_message(message_id: str) -> None:
+    """Restore a message to INBOX.
+
+    Args:
+        message_id: Message ID
+    """
+    service = build_email_service()
+
+    service.users().messages().modify(
+        userId="me",
+        id=message_id,
+        body={"addLabelIds": ["INBOX"]},
+    ).execute()
+
+
+def mark_message_spam(message_id: str) -> None:
+    """Mark a message as spam and move to Spam label.
+
+    Args:
+        message_id: Message ID
+    """
+    service = build_email_service()
+
+    service.users().messages().modify(
+        userId="me",
+        id=message_id,
+        body={"addLabelIds": ["SPAM"], "removeLabelIds": ["INBOX"]},
+    ).execute()
+
+
+def permanently_delete_message(message_id: str) -> None:
+    """Permanently delete a message.
+
+    Args:
+        message_id: Message ID
+    """
+    service = build_email_service()
+
+    service.users().messages().delete(userId="me", id=message_id).execute()
+
+
+def batch_add_label(message_ids: List[str], label_name: str) -> Dict[str, Any]:
+    """Add a label to multiple messages.
+
+    Args:
+        message_ids: List of message IDs
+        label_name: Label name
+
+    Returns:
+        Dict with success/failure counts
+    """
+    service = build_email_service()
+
+    # Resolve label name to ID
+    label_id = resolve_label_name_to_id(label_name)
+    if not label_id:
+        raise ValueError(f"Label '{label_name}' not found")
+
+    success_count = 0
+    failure_count = 0
+    errors = []
+
+    for msg_id in message_ids:
+        try:
+            service.users().messages().modify(
+                userId="me",
+                id=msg_id,
+                body={"addLabelIds": [label_id]},
+            ).execute()
+            success_count += 1
+        except Exception as e:
+            failure_count += 1
+            errors.append({"message_id": msg_id, "error": str(e)})
+
+    return {
+        "success_count": success_count,
+        "failure_count": failure_count,
+        "errors": errors,
+    }
+
+
+def batch_remove_label(message_ids: List[str], label_name: str) -> Dict[str, Any]:
+    """Remove a label from multiple messages.
+
+    Args:
+        message_ids: List of message IDs
+        label_name: Label name
+
+    Returns:
+        Dict with success/failure counts
+    """
+    service = build_email_service()
+
+    # Resolve label name to ID
+    label_id = resolve_label_name_to_id(label_name)
+    if not label_id:
+        raise ValueError(f"Label '{label_name}' not found")
+
+    success_count = 0
+    failure_count = 0
+    errors = []
+
+    for msg_id in message_ids:
+        try:
+            service.users().messages().modify(
+                userId="me",
+                id=msg_id,
+                body={"removeLabelIds": [label_id]},
+            ).execute()
+            success_count += 1
+        except Exception as e:
+            failure_count += 1
+            errors.append({"message_id": msg_id, "error": str(e)})
+
+    return {
+        "success_count": success_count,
+        "failure_count": failure_count,
+        "errors": errors,
+    }
+
+
+def batch_set_read(message_ids: List[str]) -> Dict[str, Any]:
+    """Mark multiple messages as read.
+
+    Args:
+        message_ids: List of message IDs
+
+    Returns:
+        Dict with success/failure counts
+    """
+    service = build_email_service()
+
+    success_count = 0
+    failure_count = 0
+    errors = []
+
+    for msg_id in message_ids:
+        try:
+            service.users().messages().modify(
+                userId="me",
+                id=msg_id,
+                body={"removeLabelIds": ["UNREAD"]},
+            ).execute()
+            success_count += 1
+        except Exception as e:
+            failure_count += 1
+            errors.append({"message_id": msg_id, "error": str(e)})
+
+    return {
+        "success_count": success_count,
+        "failure_count": failure_count,
+        "errors": errors,
+    }
+
+
+def batch_set_unread(message_ids: List[str]) -> Dict[str, Any]:
+    """Mark multiple messages as unread.
+
+    Args:
+        message_ids: List of message IDs
+
+    Returns:
+        Dict with success/failure counts
+    """
+    service = build_email_service()
+
+    success_count = 0
+    failure_count = 0
+    errors = []
+
+    for msg_id in message_ids:
+        try:
+            service.users().messages().modify(
+                userId="me",
+                id=msg_id,
+                body={"addLabelIds": ["UNREAD"]},
+            ).execute()
+            success_count += 1
+        except Exception as e:
+            failure_count += 1
+            errors.append({"message_id": msg_id, "error": str(e)})
+
+    return {
+        "success_count": success_count,
+        "failure_count": failure_count,
+        "errors": errors,
+    }
+
+
+def batch_archive(message_ids: List[str]) -> Dict[str, Any]:
+    """Archive multiple messages.
+
+    Args:
+        message_ids: List of message IDs
+
+    Returns:
+        Dict with success/failure counts
+    """
+    service = build_email_service()
+
+    success_count = 0
+    failure_count = 0
+    errors = []
+
+    for msg_id in message_ids:
+        try:
+            service.users().messages().modify(
+                userId="me",
+                id=msg_id,
+                body={"removeLabelIds": ["INBOX"]},
+            ).execute()
+            success_count += 1
+        except Exception as e:
+            failure_count += 1
+            errors.append({"message_id": msg_id, "error": str(e)})
+
+    return {
+        "success_count": success_count,
+        "failure_count": failure_count,
+        "errors": errors,
+    }
+
+
+def batch_delete(message_ids: List[str]) -> Dict[str, Any]:
+    """Permanently delete multiple messages.
+
+    Args:
+        message_ids: List of message IDs
+
+    Returns:
+        Dict with success/failure counts
+    """
+    service = build_email_service()
+
+    success_count = 0
+    failure_count = 0
+    errors = []
+
+    for msg_id in message_ids:
+        try:
+            service.users().messages().delete(userId="me", id=msg_id).execute()
+            success_count += 1
+        except Exception as e:
+            failure_count += 1
+            errors.append({"message_id": msg_id, "error": str(e)})
+
+    return {
+        "success_count": success_count,
+        "failure_count": failure_count,
+        "errors": errors,
+    }
