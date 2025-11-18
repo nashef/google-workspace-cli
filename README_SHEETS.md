@@ -395,6 +395,247 @@ gwc-sheets update spreadsheet_id --range "'Week 1'!A1:C10" --values "[weekly_dat
    - Can require editor permission
    - Protect content from accidental modification
 
+## REST API Reference
+
+This section documents the actual REST endpoints and structures used by the Sheets API v4.
+
+### Spreadsheets Resource
+
+#### Create Spreadsheet
+```
+POST /v4/spreadsheets
+Request: {
+  "properties": {
+    "title": "string",
+    "locale": "string",
+    "timeZone": "string",
+    "autoRecalc": "ON_CHANGE" | "ON_CHANGE" | "OFF"
+  }
+}
+Response: Spreadsheet object with spreadsheetId, properties, sheets, etc.
+```
+
+#### Get Spreadsheet
+```
+GET /v4/spreadsheets/{spreadsheetId}
+Response: Full Spreadsheet object with metadata, sheets, layouts, etc.
+```
+
+#### Batch Update Spreadsheet
+```
+POST /v4/spreadsheets/{spreadsheetId}:batchUpdate
+Request: {
+  "requests": [
+    // Array of Request objects (AddSheetRequest, UpdateCellsRequest, etc.)
+  ],
+  "responseIncludes": ["SPREADSHEET_PROPERTIES", "SHEETS", "etc."]
+}
+Response: {
+  "spreadsheetId": "string",
+  "replies": [ /* responses from each request */ ]
+}
+```
+
+#### Get by Data Filter
+```
+POST /v4/spreadsheets/{spreadsheetId}:getByDataFilter
+Request: {
+  "dataFilters": [ { "gridRange": {...} } or { "developerMetadataLookup": {...} } ]
+}
+Response: Data matching the filters
+```
+
+### Spreadsheets.Values Resource
+
+#### Read Range
+```
+GET /v4/spreadsheets/{spreadsheetId}/values/{range}
+Query Parameters:
+  - valueRenderOption: "FORMATTED_VALUE" | "UNFORMATTED_VALUE" | "FORMULA"
+  - dateTimeRenderOption: "SERIAL_NUMBER" | "FORMATTED_STRING"
+Response: {
+  "range": "string",
+  "majorDimension": "ROWS" | "COLUMNS",
+  "values": [ [ "cell1", "cell2" ], ... ]
+}
+```
+
+#### Batch Get
+```
+POST /v4/spreadsheets/{spreadsheetId}/values:batchGet
+Request: {
+  "ranges": ["range1", "range2", ...],
+  "valueRenderOption": "FORMATTED_VALUE",
+  "dateTimeRenderOption": "FORMATTED_STRING"
+}
+Response: {
+  "spreadsheetId": "string",
+  "valueRanges": [ /* multiple ValueRange objects */ ]
+}
+```
+
+#### Update Values
+```
+PUT /v4/spreadsheets/{spreadsheetId}/values/{range}
+Query Parameters:
+  - valueInputOption: "USER_ENTERED" | "RAW" (required)
+Request: {
+  "values": [ [ "val1", "val2" ], ... ],
+  "majorDimension": "ROWS"
+}
+Response: {
+  "updatedRange": "string",
+  "updatedRows": integer,
+  "updatedColumns": integer,
+  "updatedCells": integer
+}
+```
+
+#### Append Values
+```
+POST /v4/spreadsheets/{spreadsheetId}/values/{range}:append
+Query Parameters:
+  - valueInputOption: "USER_ENTERED" | "RAW"
+  - insertDataOption: "OVERWRITE" | "INSERT_ROWS"
+Request: {
+  "values": [ [ "val1", "val2" ], ... ]
+}
+Response: {
+  "spreadsheetId": "string",
+  "updatedRange": "string",
+  "updatedRows": integer,
+  "updatedColumns": integer,
+  "updatedCells": integer
+}
+```
+
+#### Batch Update Values
+```
+POST /v4/spreadsheets/{spreadsheetId}/values:batchUpdate
+Request: {
+  "valueInputOption": "USER_ENTERED" | "RAW",
+  "data": [
+    {
+      "range": "range1",
+      "values": [ [ "val1", "val2" ], ... ]
+    },
+    // More ValueRange objects
+  ]
+}
+Response: {
+  "spreadsheetId": "string",
+  "totalUpdatedRows": integer,
+  "totalUpdatedColumns": integer,
+  "totalUpdatedCells": integer,
+  "responses": [ /* UpdateValuesResponse for each range */ ]
+}
+```
+
+#### Clear Range
+```
+POST /v4/spreadsheets/{spreadsheetId}/values/{range}:clear
+Response: {
+  "spreadsheetId": "string",
+  "clearedRange": "string"
+}
+```
+
+#### Batch Clear Values
+```
+POST /v4/spreadsheets/{spreadsheetId}/values:batchClear
+Request: {
+  "ranges": ["range1", "range2", ...]
+}
+Response: {
+  "spreadsheetId": "string",
+  "clearedRanges": [ "range1", "range2", ... ]
+}
+```
+
+### Spreadsheets.Sheets Resource
+
+#### Copy Sheet
+```
+POST /v4/spreadsheets/{spreadsheetId}/sheets/{sheetId}:copyTo
+Request: {
+  "destinationSpreadsheetId": "spreadsheet_id" (optional - defaults to same spreadsheet)
+}
+Response: {
+  "sheetId": integer,
+  "title": "string",
+  "index": integer,
+  // ... other sheet properties
+}
+```
+
+### Spreadsheets.DeveloperMetadata Resource
+
+#### Get Metadata
+```
+GET /v4/spreadsheets/{spreadsheetId}/developerMetadata/{metadataId}
+Response: DeveloperMetadata object
+```
+
+#### Search Metadata
+```
+POST /v4/spreadsheets/{spreadsheetId}/developerMetadata:search
+Request: {
+  "metadataFilter": {
+    "metadataKey": "string",
+    "metadataValue": "string",
+    "visibility": "TEST_AND_NORMAL" | "TEST" | "NORMAL"
+  }
+}
+Response: {
+  "matchedMetadata": [ /* array of DeveloperMetadata */ ]
+}
+```
+
+### Key Request Types for batchUpdate
+
+The `batchUpdate` operation accepts many request types in the "requests" array:
+
+**Sheet Management:**
+- `AddSheetRequest` - Add new sheet
+- `DeleteSheetRequest` - Remove sheet
+- `UpdateSheetPropertiesRequest` - Modify sheet properties
+- `InsertDimensionRequest` - Insert rows/columns
+- `DeleteDimensionRequest` - Delete rows/columns
+- `AppendDimensionRequest` - Expand grid
+
+**Data Operations:**
+- `UpdateValuesRequest` - Update cell values
+- `UpdateCellsRequest` - Update cells with formatting
+
+**Formatting:**
+- `UpdateCellsRequest` - Cell formatting
+- `UpdateConditionalFormatRuleRequest` - Conditional formatting
+- `UpdateBordersRequest` - Cell borders
+- `UpdateBooleanPropertiesRequest` - Text wrapping, merged cells
+
+**Advanced:**
+- `AddProtectedRangeRequest` - Create protected range
+- `UpdateProtectedRangeRequest` - Modify protection
+- `DeleteProtectedRangeRequest` - Remove protection
+- `AddNamedRangeRequest` - Create named range
+- `UpdateNamedRangeRequest` - Modify named range
+- `DeleteNamedRangeRequest` - Remove named range
+
+### Field Masks
+
+When updating spreadsheet properties, use `fields` parameter to specify which fields to update:
+
+```
+fields: "properties.title,properties.locale,sheets(properties.title,data)"
+```
+
+Common field masks:
+- `properties` - Spreadsheet properties (title, locale, timezone)
+- `sheets` - Sheet list and their properties
+- `namedRanges` - Named ranges
+- `protectedRanges` - Protected ranges
+- `developerMetadata` - Developer metadata
+
 ## MIME Types
 
 - Spreadsheet: `application/vnd.google-apps.spreadsheet`
