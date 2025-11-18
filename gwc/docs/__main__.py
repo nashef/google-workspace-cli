@@ -27,6 +27,11 @@ from gwc.docs.operations import (
     create_footer,
     delete_header,
     delete_footer,
+    batch_update,
+    batch_update_from_file,
+    create_named_range,
+    delete_named_range,
+    get_document_revisions,
 )
 from gwc.shared.output import format_output, OutputFormat
 
@@ -549,6 +554,99 @@ def delete_footer_cmd(document_id, footer_id):
         click.echo(f"Footer {footer_id} deleted")
     except Exception as e:
         click.echo(f"Error deleting footer: {e}", err=True)
+        raise click.Abort()
+
+
+# ============================================================================
+# Phase 4: Advanced Features & Automation
+# ============================================================================
+
+
+@main.command()
+@click.argument("document_id")
+@click.argument("batch_file")
+def batch_update_cmd(document_id, batch_file):
+    """Execute batch updates from a JSON file.
+
+    Allows multiple document changes to be applied atomically in a single operation.
+    All changes succeed together or all fail together (atomic).
+
+    Batch file format:
+    {
+        "requests": [
+            {"insertText": {"text": "Hello", "location": {"index": 0}}},
+            {"updateTextStyle": {"range": {"startIndex": 0, "endIndex": 5}, "textStyle": {"bold": true}, "fields": "bold"}}
+        ]
+    }
+
+    Examples:
+        gwc-docs batch-update doc_id updates.json
+        gwc-docs batch-update doc_id complex_changes.json
+    """
+    try:
+        result = batch_update_from_file(document_id, batch_file)
+        reply_count = len(result.get("replies", []))
+        click.echo(f"Batch update executed: {reply_count} operations completed")
+    except Exception as e:
+        click.echo(f"Error executing batch update: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("document_id")
+@click.option("--name", required=True, help="Name for the range (must be unique)")
+@click.option("--start-index", type=int, required=True, help="Start position (inclusive)")
+@click.option("--end-index", type=int, required=True, help="End position (exclusive)")
+def create_named_range_cmd(document_id, name, start_index, end_index):
+    """Create a named range in the document.
+
+    Named ranges are useful for templating and programmatic content replacement.
+
+    Examples:
+        gwc-docs create-named-range doc_id --name "customer_name" --start-index 0 --end-index 10
+        gwc-docs create-named-range doc_id --name "signature" --start-index 100 --end-index 120
+    """
+    try:
+        range_id = create_named_range(document_id, name, start_index, end_index)
+        click.echo(f"Named range '{name}' created with ID: {range_id}")
+    except Exception as e:
+        click.echo(f"Error creating named range: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("document_id")
+@click.argument("range_id")
+def delete_named_range_cmd(document_id, range_id):
+    """Delete a named range from the document.
+
+    Examples:
+        gwc-docs delete-named-range doc_id range_id_here
+    """
+    try:
+        delete_named_range(document_id, range_id)
+        click.echo(f"Named range {range_id} deleted")
+    except Exception as e:
+        click.echo(f"Error deleting named range: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("document_id")
+def get_revisions_cmd(document_id):
+    """Get document revision history.
+
+    Shows current revision information. For full revision history,
+    use the Drive API with the document's Drive file ID.
+
+    Examples:
+        gwc-docs get-revisions doc_id
+    """
+    try:
+        revisions = get_document_revisions(document_id)
+        click.echo(format_output(revisions, "llm"))
+    except Exception as e:
+        click.echo(f"Error getting revisions: {e}", err=True)
         raise click.Abort()
 
 

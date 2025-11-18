@@ -640,3 +640,122 @@ class TestPhase3CommandInvocation:
             catch_exceptions=False,
         )
         assert result.exit_code in [0, 1]
+
+
+class TestPhase4Advanced:
+    """Test Phase 4 advanced features and automation commands."""
+
+    def test_batch_update_help(self, runner):
+        """Test batch-update command help."""
+        result = runner.invoke(docs_cli.main, ["batch-update", "--help"])
+        assert result.exit_code == 0
+        assert "DOCUMENT_ID" in result.output
+        assert "BATCH_FILE" in result.output
+
+    def test_create_named_range_help(self, runner):
+        """Test create-named-range command help."""
+        result = runner.invoke(docs_cli.main, ["create-named-range", "--help"])
+        assert result.exit_code == 0
+        assert "DOCUMENT_ID" in result.output
+        assert "--name" in result.output
+        assert "--start-index" in result.output
+        assert "--end-index" in result.output
+
+    def test_delete_named_range_help(self, runner):
+        """Test delete-named-range command help."""
+        result = runner.invoke(docs_cli.main, ["delete-named-range", "--help"])
+        assert result.exit_code == 0
+        assert "DOCUMENT_ID" in result.output
+
+    def test_get_revisions_help(self, runner):
+        """Test get-revisions command help."""
+        result = runner.invoke(docs_cli.main, ["get-revisions", "--help"])
+        assert result.exit_code == 0
+        assert "DOCUMENT_ID" in result.output
+
+
+class TestPhase4ErrorHandling:
+    """Test error handling for Phase 4 commands."""
+
+    def test_batch_update_missing_file(self, runner):
+        """Test batch-update without batch file."""
+        result = runner.invoke(docs_cli.main, ["batch-update", "test_id"])
+        assert result.exit_code != 0
+
+    def test_batch_update_without_document_id(self, runner):
+        """Test batch-update without document ID."""
+        result = runner.invoke(docs_cli.main, ["batch-update", "batch.json"])
+        assert result.exit_code != 0
+
+    def test_create_named_range_missing_name(self, runner):
+        """Test create-named-range without name."""
+        result = runner.invoke(
+            docs_cli.main,
+            ["create-named-range", "test_id", "--start-index", "0", "--end-index", "10"],
+        )
+        assert result.exit_code != 0
+
+    def test_create_named_range_missing_indices(self, runner):
+        """Test create-named-range without indices."""
+        result = runner.invoke(docs_cli.main, ["create-named-range", "test_id", "--name", "test"])
+        assert result.exit_code != 0
+
+    def test_create_named_range_without_document_id(self, runner):
+        """Test create-named-range without document ID."""
+        result = runner.invoke(
+            docs_cli.main,
+            ["create-named-range", "--name", "test", "--start-index", "0", "--end-index", "10"],
+        )
+        assert result.exit_code != 0
+
+    def test_delete_named_range_missing_range_id(self, runner):
+        """Test delete-named-range without range ID."""
+        result = runner.invoke(docs_cli.main, ["delete-named-range", "test_id"])
+        assert result.exit_code != 0
+
+    def test_delete_named_range_without_document_id(self, runner):
+        """Test delete-named-range without document ID."""
+        result = runner.invoke(docs_cli.main, ["delete-named-range", "range_id"])
+        assert result.exit_code != 0
+
+
+class TestPhase4CommandInvocation:
+    """Test that all Phase 4 commands can be invoked."""
+
+    def test_batch_update_invocation(self, runner):
+        """Test batch-update command invocation with missing file."""
+        # This will fail with file not found, but that's expected for this test
+        result = runner.invoke(
+            docs_cli.main,
+            ["batch-update", "test_id", "nonexistent.json"],
+            catch_exceptions=False,
+        )
+        # Either error code or file not found is acceptable
+        assert result.exit_code in [0, 1, 2]
+
+    def test_create_named_range_invocation(self, runner):
+        """Test create-named-range command invocation."""
+        result = runner.invoke(
+            docs_cli.main,
+            ["create-named-range", "test_id", "--name", "test_range", "--start-index", "0", "--end-index", "10"],
+            catch_exceptions=False,
+        )
+        assert result.exit_code in [0, 1]
+
+    def test_delete_named_range_invocation(self, runner):
+        """Test delete-named-range command invocation."""
+        result = runner.invoke(
+            docs_cli.main,
+            ["delete-named-range", "test_id", "range_id_123"],
+            catch_exceptions=False,
+        )
+        assert result.exit_code in [0, 1]
+
+    def test_get_revisions_invocation(self, runner):
+        """Test get-revisions command invocation."""
+        result = runner.invoke(
+            docs_cli.main,
+            ["get-revisions", "test_id"],
+            catch_exceptions=False,
+        )
+        assert result.exit_code in [0, 1]

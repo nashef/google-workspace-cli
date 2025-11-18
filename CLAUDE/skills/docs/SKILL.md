@@ -411,14 +411,209 @@ gwc-docs insert-footnote $DOC_ID --text "Smith et al., 2024" --index 32
    - Each insertion shifts subsequent indices
    - Consider batching complex operations (Phase 4)
 
-## Coming in Phase 4
+## Phase 4: Advanced Features & Automation
 
-- Manage table rows/columns (insert/delete rows)
-- Batch update operations for efficiency
-- Suggestions and tracked changes
-- Named ranges for templating
-- Document merging and mail merge
-- Complex automation workflows
+Phase 4 enables **complex workflows, templating, and automation**:
+- ✅ Batch update operations (multiple changes atomically)
+- ✅ Named ranges for templating and referencing
+- ✅ Revision tracking information
+- ✅ Support for multi-step document generation
+
+### Phase 4 Commands
+
+#### Batch Operations
+
+| Task | Command |
+|------|---------|
+| Execute batch updates | `batch-update doc_id batch-requests.json` |
+
+#### Named Ranges (Templating)
+
+| Task | Command |
+|------|---------|
+| Create named range | `create-named-range doc_id --name "field" --start-index 0 --end-index 10` |
+| Delete named range | `delete-named-range doc_id range_id_here` |
+
+#### Revision History
+
+| Task | Command |
+|------|---------|
+| Get revision info | `get-revisions doc_id` |
+
+### Phase 4 Examples
+
+**Batch Update with JSON File:**
+```bash
+# Create batch-requests.json
+cat > batch-requests.json << 'JSON'
+{
+  "requests": [
+    {
+      "insertText": {
+        "text": "Hello World",
+        "location": {"index": 0}
+      }
+    },
+    {
+      "updateTextStyle": {
+        "range": {"startIndex": 0, "endIndex": 11},
+        "textStyle": {"bold": true},
+        "fields": "bold"
+      }
+    },
+    {
+      "insertText": {
+        "text": "\n\nSecond paragraph",
+        "location": {"index": 11}
+      }
+    }
+  ]
+}
+JSON
+
+# Execute batch update
+DOC_ID=$(poetry run gwc-docs create --title "Document" | grep id | cut -d'"' -f4)
+gwc-docs batch-update $DOC_ID batch-requests.json
+```
+
+**Document Templating with Named Ranges:**
+```bash
+# Create template document
+DOC_ID=$(poetry run gwc-docs create --title "Invoice" | grep id | cut -d'"' -f4)
+
+# Add template text
+gwc-docs insert-text $DOC_ID --text "Invoice To: [CUSTOMER_NAME]" --index 0
+gwc-docs insert-text $DOC_ID --text "\nAmount: [AMOUNT]" --index 30
+gwc-docs insert-text $DOC_ID --text "\nDate: [DATE]" --index 50
+
+# Create named ranges for template fields
+CUSTOMER_RANGE=$(poetry run gwc-docs create-named-range $DOC_ID --name "customer_name" --start-index 13 --end-index 27)
+AMOUNT_RANGE=$(poetry run gwc-docs create-named-range $DOC_ID --name "amount" --start-index 40 --end-index 47)
+DATE_RANGE=$(poetry run gwc-docs create-named-range $DOC_ID --name "date" --start-index 59 --end-index 63)
+
+echo "Template created with ranges:"
+echo "Customer: $CUSTOMER_RANGE"
+echo "Amount: $AMOUNT_RANGE"
+echo "Date: $DATE_RANGE"
+```
+
+**Mail Merge Simulation:**
+```bash
+# Create template
+DOC_ID=$(poetry run gwc-docs create --title "Customer Letter" | grep id | cut -d'"' -f4)
+gwc-docs insert-text $DOC_ID --text "Dear [CUSTOMER],\n\nThank you for your order of [PRODUCT] valued at [PRICE].\n\nBest regards,\nSales Team" --index 0
+
+# Create named ranges for merge fields
+gwc-docs create-named-range $DOC_ID --name "customer" --start-index 6 --end-index 16
+gwc-docs create-named-range $DOC_ID --name "product" --start-index 50 --end-index 59
+gwc-docs create-named-range $DOC_ID --name "price" --start-index 80 --end-index 85
+
+# For actual data replacement, use batch updates or Sheets integration
+```
+
+**Complex Multi-Step Document Generation:**
+```bash
+# Create blank document
+DOC_ID=$(poetry run gwc-docs create --title "Report" | grep id | cut -d'"' -f4)
+
+# Define batch operations
+cat > report-setup.json << 'JSON'
+{
+  "requests": [
+    {
+      "insertText": {
+        "text": "Monthly Report - November 2025",
+        "location": {"index": 0}
+      }
+    },
+    {
+      "updateTextStyle": {
+        "range": {"startIndex": 0, "endIndex": 30},
+        "textStyle": {"bold": true, "fontSize": {"magnitude": 16, "unit": "PT"}},
+        "fields": "bold,fontSize"
+      }
+    },
+    {
+      "insertText": {
+        "text": "\n\nExecutive Summary\n",
+        "location": {"index": 30}
+      }
+    },
+    {
+      "updateParagraphStyle": {
+        "range": {"startIndex": 33, "endIndex": 50},
+        "paragraphStyle": {"namedStyleType": "HEADING_1"},
+        "fields": "namedStyleType"
+      }
+    },
+    {
+      "insertPageBreak": {
+        "location": {"index": 50}
+      }
+    },
+    {
+      "insertText": {
+        "text": "Detailed Analysis",
+        "location": {"index": 51}
+      }
+    }
+  ]
+}
+JSON
+
+# Execute all changes atomically
+gwc-docs batch-update $DOC_ID report-setup.json
+```
+
+### Phase 4 Important Notes
+
+1. **Batch Updates:**
+   - All operations execute atomically (all succeed or all fail)
+   - Requests are processed in order
+   - Indices shift as each operation completes
+   - Efficient for multi-step changes (single API call)
+   - Up to 100 requests per batch
+
+2. **Named Ranges:**
+   - Must have unique names within document
+   - Returns range ID for future reference
+   - Useful for template placeholders
+   - Can be deleted after use
+   - Support mail-merge-like workflows
+
+3. **Batch File Format:**
+   - JSON file with "requests" array key
+   - Each request is a batch operation object
+   - Reference Google Docs API docs for operation types
+   - Common operations: insertText, updateTextStyle, updateParagraphStyle
+
+4. **Revision Tracking:**
+   - `get-revisions` shows current revision info
+   - Full revision history available via Drive API
+   - Each document has a revision ID
+   - Useful for tracking document versions
+
+5. **Automation Patterns:**
+   - Batch updates: Complex multi-step changes
+   - Named ranges: Template variable placeholders
+   - Combine with Sheets API for data-driven templates
+   - Use for document generation pipelines
+
+### Phase 4 Use Cases
+
+- **Document Generation**: Build complex documents from templates with batch updates
+- **Mail Merge**: Use named ranges + data source for bulk document creation
+- **Report Automation**: Generate multi-page reports with consistent formatting
+- **Template Processing**: Replace template variables in named ranges
+- **Workflow Automation**: Complex multi-step document creation scripts
+
+## Complete Docs API Coverage
+
+All phases complete! You now have:
+- **Phase 1** ✅ - Reading, analysis, export
+- **Phase 2** ✅ - Text editing, formatting
+- **Phase 3** ✅ - Tables, images, structural elements
+- **Phase 4** ✅ - Batch operations, templating, automation
 
 ## Documentation
 
