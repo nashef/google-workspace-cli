@@ -1,15 +1,12 @@
-# Apologia
+# WARNING
 
-This is completely vibe-coded and highly experimental, but it seems to basically work, and appears to be very useful.
+Two things--
 
+First, we all know you're going to put these in the hands of an LLM. When you do, please be careful. These tools try to cover the *entire* REST API for each of the supported services, which means that they could do extensive damage if just give them to your coder LLM. The coder LLM can easily get prompt injected by reading your email for you or looking at docs that have been randomly shared to you. If they have these tools, then that's basically a remote root on your whole Google Workspace.
 
-Nota Bene: *Think very carefully about your access rules.* These tools try to cover the entire REST API for each of the supported services, which means that they could do extensive damage if your LLM got prompt injected. E.g., by reading a Phishing email that contains a hidden subversive prompt for your AI. One that, for example, causes your own agent to replace your company name with an expletive in every Sheets doc in your entire Google Drive.
+This is completely vibe-coded and highly experimental. There are almost certainly completely insane and horrible bugs, including security bugs, all through this code. I'm sure most of the code is slop.
 
-I am warning you now to think very carefully about how you use these tools.
-
-That said, I included Claude Skills for all of the tools.
-
-If you try it out, after all that, have your LLM write bug reports. Send them to me. I will fix them.
+Use with caution and care, friends.
 
 # google-workspace-cli
 
@@ -19,26 +16,36 @@ A command line toolkit for interacting with Google Workspace APIs (Calendar, Gma
 
 ### Installation & Setup
 
-1. **Install dependencies** (one time):
-   ```bash
-   poetry install
-   ```
+1. **Install dependencies**
 
-2. **Authenticate** (one time):
+This project uses poetry to manage dependencies and do builds. Start by initializing the poetry environment:
 
-    Before you authenticate, you must [create credentials in the Google Cloud console](https://developers.google.com/workspace/guides/create-credentials) for a desktop app client. Once you have downloaded the credentials.json and place it here: `~/.config/credential.json`. You can then run the auth flow.
+```bash
+poetry install
+```
 
-   ```bash
-   poetry run gwc auth
-   ```
+2. **Authenticate**
 
-   This will print an authorization URL to your terminal. You must visit this in a browser tab logged into the same account or organization you used to create the credentials above. The URL will take you through the OAuth authorization flow. If the `gwc auth` command is running on the same machine as the browser, then the browser should automatically complete the OAuth flow. If you are running this on a server, your browser may try to visit localhost on a weird port, and get an error. That's ok, just copy that URL over to the server where `gwc auth` is running and curl it. Make sure to put the URL in single quotes as shown:
+Before you authenticate, you must [create credentials in the Google Cloud console](https://developers.google.com/workspace/guides/create-credentials) for a desktop app client. Once you have downloaded the credentials.json and place it here: `~/.config/credential.json`. You can then run the auth flow.
 
-   ```bash
-   curl '<ENTIRE_LONG_URL>'
-   ```
 
-   Your oauth token will be saved to `~/.config/gwc/token.json`. It can be refreshed using `gwc auth --refresh` without having to complete the login flow again.
+```bash
+poetry run gwc auth
+```
+
+
+This will print an authorization URL to your terminal. You must visit this in a browser tab logged into the same account or organization you used to create the credentials above. The URL will take you through the OAuth authorization flow. If the `gwc auth` command is running on the same machine as the browser, then the browser should automatically complete the OAuth flow. If you are running this on a server, your browser may try to visit localhost on a weird port, and get an error. That's ok, just copy that URL over to the server where `gwc auth` is running and curl it. Make sure to put the URL in single quotes as shown:
+
+
+```bash
+curl '<ENTIRE_LONG_URL>'
+```
+
+Your oauth token will be saved to `~/.config/gwc/token.json`. It can be refreshed using `gwc auth --refresh` without having to complete the login flow again.a
+
+3. **Install Claude Code Skills**:
+
+You can copy the entire skill tree from `CLAUDE/skills/` into whatever `.claude/` directory you want. I suggest putting them in project directories, so you have a bit more control over what the LLM chooses to use for each project. Removing commands you don't want the LLM to run will usually prevent Claude Code from running them *but not always*. It knows how to use the `--help` option and it figures things out.
 
 ### Available Commands by API
 
