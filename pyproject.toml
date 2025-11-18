@@ -19,6 +19,8 @@ pytz = "^2023.3"
 pytest = "^7.4.0"
 
 [tool.poetry.scripts]
+gwc = "gwc.__main__:main"
+gwc-auth = "gwc.__main__:main"
 gwc-cal = "gwc.calendar:main"
 gwc-mail = "gwc.email:main"
 gwc-drive = "gwc.drive:main"
