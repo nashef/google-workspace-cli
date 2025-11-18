@@ -376,7 +376,8 @@ def send(to: str, subject: str, body: str, cc: str, bcc: str, attachments):
           --attachments /path/to/file.pdf
     """
     try:
-        message_id = send_message(to, subject, body, cc, bcc, list(attachments))
+        attachment_list = tuple(attachments) if attachments else []
+        message_id = send_message(to, subject, body, cc, bcc, attachment_list)
         click.echo(f"Message sent! ID: {message_id}")
     except FileNotFoundError as e:
         click.echo(f"Error: {e}", err=True)
@@ -406,7 +407,8 @@ def draft_create(to: str, subject: str, body: str, cc: str, bcc: str, attachment
           --attachments /path/to/file.pdf
     """
     try:
-        draft_id = create_draft(to, subject, body, cc, bcc, list(attachments))
+        attachment_list = tuple(attachments) if attachments else []
+        draft_id = create_draft(to, subject, body, cc, bcc, attachment_list)
         click.echo(f"Draft created! ID: {draft_id}")
     except FileNotFoundError as e:
         click.echo(f"Error: {e}", err=True)
@@ -734,7 +736,8 @@ def batch_add_label_cmd(message_ids, label_name: str, output: str):
         gwc-email batch-add-label msg1 msg2 msg3 "Project X"
     """
     try:
-        result = batch_add_label(list(message_ids), label_name)
+        message_ids_list = tuple(message_ids) if message_ids else []
+        result = batch_add_label(message_ids_list, label_name)
         click.echo(format_output([result], output))
     except ValueError as e:
         click.echo(f"Error: {e}", err=True)
@@ -760,7 +763,8 @@ def batch_remove_label_cmd(message_ids, label_name: str, output: str):
         gwc-email batch-remove-label msg1 msg2 msg3 "Project X"
     """
     try:
-        result = batch_remove_label(list(message_ids), label_name)
+        message_ids_list = tuple(message_ids) if message_ids else []
+        result = batch_remove_label(message_ids_list, label_name)
         click.echo(format_output([result], output))
     except ValueError as e:
         click.echo(f"Error: {e}", err=True)
@@ -785,7 +789,8 @@ def batch_mark_read(message_ids, output: str):
         gwc-email batch-mark-read msg1 msg2 msg3
     """
     try:
-        result = batch_set_read(list(message_ids))
+        message_ids_list = tuple(message_ids) if message_ids else []
+        result = batch_set_read(message_ids_list)
         click.echo(format_output([result], output))
     except Exception as e:
         click.echo(f"Error in batch operation: {e}", err=True)
@@ -807,7 +812,8 @@ def batch_mark_unread(message_ids, output: str):
         gwc-email batch-mark-unread msg1 msg2 msg3
     """
     try:
-        result = batch_set_unread(list(message_ids))
+        message_ids_list = tuple(message_ids) if message_ids else []
+        result = batch_set_unread(message_ids_list)
         click.echo(format_output([result], output))
     except Exception as e:
         click.echo(f"Error in batch operation: {e}", err=True)
@@ -829,7 +835,8 @@ def batch_archive_cmd(message_ids, output: str):
         gwc-email batch-archive msg1 msg2 msg3
     """
     try:
-        result = batch_archive(list(message_ids))
+        message_ids_list = tuple(message_ids) if message_ids else []
+        result = batch_archive(message_ids_list)
         click.echo(format_output([result], output))
     except Exception as e:
         click.echo(f"Error in batch operation: {e}", err=True)
@@ -856,7 +863,8 @@ def batch_delete_cmd(message_ids, confirm: bool, output: str):
             if not click.confirm(f"Permanently delete {len(message_ids)} messages?"):
                 click.echo("Cancelled.")
                 return
-        result = batch_delete(list(message_ids))
+        message_ids_list = tuple(message_ids) if message_ids else []
+        result = batch_delete(message_ids_list)
         click.echo(format_output([result], output))
     except Exception as e:
         click.echo(f"Error in batch operation: {e}", err=True)
