@@ -1,6 +1,6 @@
 ---
 name: email
-description: Gmail management and email operations (Phases 1-3 complete)
+description: Gmail management and email operations (Phases 1-4 complete)
 ---
 
 ## Status
@@ -8,8 +8,11 @@ description: Gmail management and email operations (Phases 1-3 complete)
 ✅ **Phase 1**: Message reading, searching, and label management
 ✅ **Phase 2**: Message composition, drafts, send, reply, forward with attachments
 ✅ **Phase 3**: Message organization (read/unread, archive, labels) and batch operations
+✅ **Phase 4**: Advanced features (filters, signatures, auto-responders, templates)
 
 All core email functionality is fully implemented and tested.
+
+**Note**: Smart compose suggestions are NOT IMPLEMENTED (as of Phase 4).
 
 ## Quick Start
 
@@ -205,6 +208,23 @@ poetry run gwc-email labels --help
 - `batch-archive` - Archive multiple messages
 - `batch-delete` - Permanently delete multiple messages
 
+**Advanced Features (Phase 4):**
+- `filters create` - Create message filter/rule
+- `filters list` - List all filters
+- `filters get` - Get filter details
+- `filters delete` - Delete a filter
+- `signatures list` - List all signatures
+- `signatures get` - Get signature for email address
+- `signatures update` - Update signature for email address
+- `auto-responder create` - Enable auto-responder (vacation message)
+- `auto-responder get` - Get current auto-responder settings
+- `auto-responder disable` - Disable auto-responder
+- `templates create` - Create message template
+- `templates list` - List all templates
+- `templates get` - Get template details
+- `templates delete` - Delete a template
+- `templates use` - Create draft from template
+
 **Help & Reference:**
 - `search-help` - Show search query examples
 
@@ -314,6 +334,89 @@ poetry run gwc-email forward msg123 --to alice@example.com --body "This is impor
 
 # Forward with custom subject
 poetry run gwc-email forward msg123 --to alice@example.com --subject "FYI: Project Update"
+```
+
+## Advanced Features (Phase 4)
+
+### Creating and Managing Filters
+
+Filters automatically organize incoming mail based on criteria.
+
+```bash
+# Create a filter that archives emails from a specific sender
+poetry run gwc-email filters create "Archive spam" --from "spam@example.com" --action archive
+
+# Create a filter that labels emails to a specific address
+poetry run gwc-email filters create "Work mail" --to "work@example.com" --action add-label --label Work
+
+# Create a filter for messages with attachments
+poetry run gwc-email filters create "Attachments" --has-attachment --action add-label --label Attachments
+
+# List all filters
+poetry run gwc-email filters list --output llm
+
+# Delete a filter
+poetry run gwc-email filters delete filter_id
+```
+
+### Managing Signatures
+
+Email signatures are templates appended to outgoing messages.
+
+```bash
+# List all signatures
+poetry run gwc-email signatures list --output llm
+
+# Get signature for a specific email address
+poetry run gwc-email signatures get user@example.com --output json
+
+# Update signature (HTML supported)
+poetry run gwc-email signatures update user@example.com "<p>Best regards,<br/>John Doe</p>"
+```
+
+### Auto-Responders (Vacation Messages)
+
+Automatically reply to incoming messages while you're away.
+
+```bash
+# Enable auto-responder
+poetry run gwc-email auto-responder create --subject "Out of Office" --message "I'm on vacation and will reply when I return."
+
+# Enable with date range
+poetry run gwc-email auto-responder create --subject "Out of Office" --message "Back on Dec 15" \
+  --start-date 2025-12-01 --end-date 2025-12-15
+
+# Check current auto-responder settings
+poetry run gwc-email auto-responder get --output json
+
+# Disable auto-responder
+poetry run gwc-email auto-responder disable
+```
+
+### Message Templates
+
+Templates store pre-written message bodies for reuse.
+
+```bash
+# Create a template
+poetry run gwc-email templates create "Weekly Report" \
+  --subject "Weekly Update" \
+  --body "<p>Week of...</p><ul><li>Item 1</li></ul>"
+
+# List all templates
+poetry run gwc-email templates list --output llm
+
+# Get template details
+poetry run gwc-email templates get template123 --output json
+
+# Use a template (creates a draft)
+poetry run gwc-email templates use template123 --to alice@example.com
+
+# Use template with CC
+poetry run gwc-email templates use template123 --to alice@example.com --cc boss@example.com
+
+# Delete a template
+poetry run gwc-email templates delete template123
 ```
 
 ## Message Organization (Phase 3)

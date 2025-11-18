@@ -39,6 +39,22 @@ from gwc.email.operations import (
     batch_set_unread,
     batch_archive,
     batch_delete,
+    # Phase 4: Advanced features
+    create_filter,
+    list_filters,
+    get_filter,
+    delete_filter,
+    get_signature,
+    update_signature,
+    list_signatures,
+    create_auto_responder,
+    get_auto_responder,
+    disable_auto_responder,
+    create_template,
+    list_templates,
+    get_template,
+    delete_template,
+    use_template,
 )
 from gwc.shared.output import format_output, OutputFormat
 
@@ -58,6 +74,30 @@ def draft():
 @main.group()
 def labels():
     """Manage labels."""
+    pass
+
+
+@main.group()
+def filters():
+    """Manage message filters/rules."""
+    pass
+
+
+@main.group()
+def signatures():
+    """Manage email signatures."""
+    pass
+
+
+@main.group()
+def auto_responder():
+    """Manage auto-responders (vacation messages)."""
+    pass
+
+
+@main.group()
+def templates():
+    """Manage message templates."""
     pass
 
 
@@ -868,6 +908,413 @@ def batch_delete_cmd(message_ids, confirm: bool, output: str):
         click.echo(format_output([result], output))
     except Exception as e:
         click.echo(f"Error in batch operation: {e}", err=True)
+        raise click.Abort()
+
+
+# ============================================================================
+# Phase 4: Advanced Features
+# ============================================================================
+
+
+# Filters
+@filters.command("create")
+@click.argument("name")
+@click.option(
+    "--from",
+    "from_addr",
+    help="Match messages from this address",
+)
+@click.option(
+    "--to",
+    "to_addr",
+    help="Match messages to this address",
+)
+@click.option(
+    "--subject",
+    help="Match messages with this subject",
+)
+@click.option(
+    "--has-attachment",
+    is_flag=True,
+    help="Match messages with attachments",
+)
+@click.option(
+    "--action",
+    type=click.Choice(["archive", "delete", "mark-read", "add-label", "skip-inbox"]),
+    required=True,
+    help="Action to apply to matching messages",
+)
+@click.option(
+    "--label",
+    help="Label to add (required if action is 'add-label')",
+)
+@click.option(
+    "--output",
+    type=click.Choice(["unix", "json", "llm"]),
+    default="unix",
+    help="Output format",
+)
+def create_filter_cmd(name, from_addr, to_addr, subject, has_attachment, action, label, output):
+    """Create a message filter/rule.
+
+    Examples:
+        gwc-email filters create "Archive old" --from "spam@example.com" --action archive
+        gwc-email filters create "Work label" --to "work@example.com" --action add-label --label Work
+    """
+    try:
+        criteria = {}
+        if from_addr:
+            criteria["from"] = from_addr
+        if to_addr:
+            criteria["to"] = to_addr
+        if subject:
+            criteria["subject"] = subject
+        if has_attachment:
+            criteria["hasAttachment"] = True
+
+        action_obj = {}
+        if action == "archive":
+            action_obj["skip"] = True
+        elif action == "delete":
+            action_obj["deletePermanently"] = True
+        elif action == "mark-read":
+            action_obj["markAsRead"] = True
+        elif action == "skip-inbox":
+            action_obj["skipInbox"] = True
+        elif action == "add-label":
+            if not label:
+                click.echo("Error: --label required for add-label action", err=True)
+                raise click.Abort()
+            action_obj["addLabelIds"] = [label]
+
+        filter_id = create_filter(criteria, action_obj)
+        result = {"id": filter_id, "name": name}
+        click.echo(format_output([result], output))
+    except Exception as e:
+        click.echo(f"Error creating filter: {e}", err=True)
+        raise click.Abort()
+
+
+@filters.command("list")
+@click.option(
+    "--output",
+    type=click.Choice(["unix", "json", "llm"]),
+    default="unix",
+    help="Output format",
+)
+def list_filters_cmd(output):
+    """List all message filters.
+
+    Examples:
+        gwc-email filters list --output llm
+    """
+    try:
+        filters_list = list_filters()
+        click.echo(format_output(filters_list, output))
+    except Exception as e:
+        click.echo(f"Error listing filters: {e}", err=True)
+        raise click.Abort()
+
+
+@filters.command("get")
+@click.argument("filter_id")
+@click.option(
+    "--output",
+    type=click.Choice(["unix", "json", "llm"]),
+    default="unix",
+    help="Output format",
+)
+def get_filter_cmd(filter_id, output):
+    """Get filter details.
+
+    Examples:
+        gwc-email filters get filter123 --output json
+    """
+    try:
+        filter_obj = get_filter(filter_id)
+        click.echo(format_output([filter_obj], output))
+    except Exception as e:
+        click.echo(f"Error getting filter: {e}", err=True)
+        raise click.Abort()
+
+
+@filters.command("delete")
+@click.argument("filter_id")
+def delete_filter_cmd(filter_id):
+    """Delete a filter.
+
+    Examples:
+        gwc-email filters delete filter123
+    """
+    try:
+        delete_filter(filter_id)
+        click.echo(f"Filter {filter_id} deleted.")
+    except Exception as e:
+        click.echo(f"Error deleting filter: {e}", err=True)
+        raise click.Abort()
+
+
+# Signatures
+@signatures.command("list")
+@click.option(
+    "--output",
+    type=click.Choice(["unix", "json", "llm"]),
+    default="unix",
+    help="Output format",
+)
+def list_signatures_cmd(output):
+    """List all email signatures.
+
+    Examples:
+        gwc-email signatures list --output llm
+    """
+    try:
+        sigs = list_signatures()
+        click.echo(format_output(sigs, output))
+    except Exception as e:
+        click.echo(f"Error listing signatures: {e}", err=True)
+        raise click.Abort()
+
+
+@signatures.command("get")
+@click.argument("send_as_email")
+@click.option(
+    "--output",
+    type=click.Choice(["unix", "json", "llm"]),
+    default="unix",
+    help="Output format",
+)
+def get_signature_cmd(send_as_email, output):
+    """Get signature for a send-as address.
+
+    Examples:
+        gwc-email signatures get user@example.com --output json
+    """
+    try:
+        sig = get_signature(send_as_email)
+        click.echo(format_output([sig], output))
+    except Exception as e:
+        click.echo(f"Error getting signature: {e}", err=True)
+        raise click.Abort()
+
+
+@signatures.command("update")
+@click.argument("send_as_email")
+@click.argument("signature_html")
+def update_signature_cmd(send_as_email, signature_html):
+    """Update signature for a send-as address.
+
+    Examples:
+        gwc-email signatures update user@example.com "<p>Best regards,<br/>John</p>"
+    """
+    try:
+        result = update_signature(send_as_email, signature_html)
+        click.echo(f"Signature updated for {send_as_email}")
+    except Exception as e:
+        click.echo(f"Error updating signature: {e}", err=True)
+        raise click.Abort()
+
+
+# Auto-responders
+@auto_responder.command("create")
+@click.option(
+    "--subject",
+    required=True,
+    help="Subject of auto-responder message",
+)
+@click.option(
+    "--message",
+    required=True,
+    help="Body of auto-responder message",
+)
+@click.option(
+    "--start-date",
+    help="Start date (YYYY-MM-DD). Default: now",
+)
+@click.option(
+    "--end-date",
+    help="End date (YYYY-MM-DD). If not set, responder stays active",
+)
+def create_auto_responder_cmd(subject, message, start_date, end_date):
+    """Enable auto-responder (vacation message).
+
+    Examples:
+        gwc-email auto-responder create --subject "Out of Office" --message "I'm on vacation."
+        gwc-email auto-responder create --subject "OOO" --message "Back soon" --start-date 2025-12-01 --end-date 2025-12-15
+    """
+    try:
+        result = create_auto_responder(subject, message, start_date, end_date)
+        click.echo("Auto-responder enabled.")
+    except Exception as e:
+        click.echo(f"Error creating auto-responder: {e}", err=True)
+        raise click.Abort()
+
+
+@auto_responder.command("get")
+@click.option(
+    "--output",
+    type=click.Choice(["unix", "json", "llm"]),
+    default="unix",
+    help="Output format",
+)
+def get_auto_responder_cmd(output):
+    """Get current auto-responder settings.
+
+    Examples:
+        gwc-email auto-responder get --output json
+    """
+    try:
+        settings = get_auto_responder()
+        click.echo(format_output([settings], output))
+    except Exception as e:
+        click.echo(f"Error getting auto-responder: {e}", err=True)
+        raise click.Abort()
+
+
+@auto_responder.command("disable")
+def disable_auto_responder_cmd():
+    """Disable auto-responder.
+
+    Examples:
+        gwc-email auto-responder disable
+    """
+    try:
+        disable_auto_responder()
+        click.echo("Auto-responder disabled.")
+    except Exception as e:
+        click.echo(f"Error disabling auto-responder: {e}", err=True)
+        raise click.Abort()
+
+
+# Templates
+@templates.command("create")
+@click.argument("name")
+@click.option(
+    "--subject",
+    required=True,
+    help="Template subject line",
+)
+@click.option(
+    "--body",
+    required=True,
+    help="Template body (HTML supported)",
+)
+@click.option(
+    "--output",
+    type=click.Choice(["unix", "json", "llm"]),
+    default="unix",
+    help="Output format",
+)
+def create_template_cmd(name, subject, body, output):
+    """Create a message template.
+
+    Examples:
+        gwc-email templates create "Weekly Report" --subject "Weekly Update" --body "..."
+    """
+    try:
+        template_id = create_template(name, body, subject)
+        result = {"id": template_id, "name": name}
+        click.echo(format_output([result], output))
+    except Exception as e:
+        click.echo(f"Error creating template: {e}", err=True)
+        raise click.Abort()
+
+
+@templates.command("list")
+@click.option(
+    "--output",
+    type=click.Choice(["unix", "json", "llm"]),
+    default="unix",
+    help="Output format",
+)
+def list_templates_cmd(output):
+    """List all templates.
+
+    Examples:
+        gwc-email templates list --output llm
+    """
+    try:
+        tmpl_list = list_templates()
+        click.echo(format_output(tmpl_list, output))
+    except Exception as e:
+        click.echo(f"Error listing templates: {e}", err=True)
+        raise click.Abort()
+
+
+@templates.command("get")
+@click.argument("template_id")
+@click.option(
+    "--output",
+    type=click.Choice(["unix", "json", "llm"]),
+    default="unix",
+    help="Output format",
+)
+def get_template_cmd(template_id, output):
+    """Get template details.
+
+    Examples:
+        gwc-email templates get template123 --output json
+    """
+    try:
+        tmpl = get_template(template_id)
+        click.echo(format_output([tmpl], output))
+    except Exception as e:
+        click.echo(f"Error getting template: {e}", err=True)
+        raise click.Abort()
+
+
+@templates.command("delete")
+@click.argument("template_id")
+def delete_template_cmd(template_id):
+    """Delete a template.
+
+    Examples:
+        gwc-email templates delete template123
+    """
+    try:
+        delete_template(template_id)
+        click.echo(f"Template {template_id} deleted.")
+    except Exception as e:
+        click.echo(f"Error deleting template: {e}", err=True)
+        raise click.Abort()
+
+
+@templates.command("use")
+@click.argument("template_id")
+@click.option(
+    "--to",
+    required=True,
+    help="Recipient email address",
+)
+@click.option(
+    "--cc",
+    help="CC recipients (comma-separated)",
+)
+@click.option(
+    "--bcc",
+    help="BCC recipients (comma-separated)",
+)
+@click.option(
+    "--output",
+    type=click.Choice(["unix", "json", "llm"]),
+    default="unix",
+    help="Output format",
+)
+def use_template_cmd(template_id, to, cc, bcc, output):
+    """Create a draft from a template.
+
+    Examples:
+        gwc-email templates use template123 --to alice@example.com
+        gwc-email templates use template123 --to alice@example.com --cc bob@example.com
+    """
+    try:
+        cc_list = [x.strip() for x in cc.split(",")] if cc else []
+        bcc_list = [x.strip() for x in bcc.split(",")] if bcc else []
+        draft_id = use_template(template_id, to, cc_list, bcc_list)
+        result = {"draft_id": draft_id, "template_id": template_id}
+        click.echo(format_output([result], output))
+    except Exception as e:
+        click.echo(f"Error using template: {e}", err=True)
         raise click.Abort()
 
 

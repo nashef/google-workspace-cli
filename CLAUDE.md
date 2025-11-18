@@ -16,6 +16,13 @@ A lightweight, Unix-philosophy CLI that exposes Google Workspace functionality t
 - ✅ Multiple output formats: unix (default), json, llm-pretty
 - ✅ Single shared codebase with multiple entry points
 
+## Gmail API Completion Status
+
+- ✅ **Phase 1**: Message reading, searching, and label management
+- ✅ **Phase 2**: Message composition, drafts, send, reply, forward with attachments
+- ✅ **Phase 3**: Message organization (read/unread, archive, labels) and batch operations
+- ✅ **Phase 4**: Advanced features (filters, signatures, auto-responders, templates)
+
 ## Implementation Plan
 
 ### Phase 1: Core Infrastructure + Calendar

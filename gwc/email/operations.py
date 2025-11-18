@@ -1016,3 +1016,332 @@ def batch_delete(message_ids: List[str]) -> Dict[str, Any]:
         "failure_count": failure_count,
         "errors": errors,
     }
+
+
+# ============================================================================
+# Advanced Features (Phase 4)
+# ============================================================================
+
+
+def create_filter(
+    criteria: Dict[str, Any],
+    action: Dict[str, Any],
+) -> str:
+    """Create a message filter/rule.
+
+    Args:
+        criteria: Filter criteria (from, to, subject, hasAttachment, query, etc.)
+            Example: {"from": "sender@example.com", "subject": "urgent"}
+        action: Actions to apply (addLabelIds, removeLabel, archive, delete, etc.)
+            Example: {"addLabelIds": ["label_id"], "archive": True}
+
+    Returns:
+        Filter ID
+    """
+    service = build_email_service()
+
+    filter_object = {
+        "criteria": criteria,
+        "action": action,
+    }
+
+    result = service.users().settings().filters().create(userId="me", body=filter_object).execute()
+
+    return result.get("id", "")
+
+
+def list_filters() -> List[Dict[str, Any]]:
+    """List all message filters.
+
+    Returns:
+        List of filter objects
+    """
+    service = build_email_service()
+
+    result = service.users().settings().filters().list(userId="me").execute()
+
+    return result.get("filter", [])
+
+
+def get_filter(filter_id: str) -> Dict[str, Any]:
+    """Get filter details.
+
+    Args:
+        filter_id: Filter ID
+
+    Returns:
+        Filter object
+    """
+    service = build_email_service()
+
+    return service.users().settings().filters().get(userId="me", id=filter_id).execute()
+
+
+def delete_filter(filter_id: str) -> None:
+    """Delete a message filter.
+
+    Args:
+        filter_id: Filter ID to delete
+    """
+    service = build_email_service()
+
+    service.users().settings().filters().delete(userId="me", id=filter_id).execute()
+
+
+def get_signature(send_as: Optional[str] = None) -> str:
+    """Get email signature.
+
+    Args:
+        send_as: Send-as address (defaults to primary email)
+
+    Returns:
+        Signature text
+    """
+    service = build_email_service()
+
+    if not send_as:
+        send_as = "me"
+
+    result = service.users().settings().sendAs().get(userId="me", sendAsEmail=send_as).execute()
+
+    return result.get("signature", "")
+
+
+def update_signature(signature_text: str, send_as: Optional[str] = None) -> None:
+    """Update email signature.
+
+    Args:
+        signature_text: New signature text (can include HTML)
+        send_as: Send-as address (defaults to primary email)
+    """
+    service = build_email_service()
+
+    if not send_as:
+        send_as = "me"
+
+    body = {"signature": signature_text}
+
+    service.users().settings().sendAs().patch(userId="me", sendAsEmail=send_as, body=body).execute()
+
+
+def list_signatures() -> List[Dict[str, Any]]:
+    """List all email signatures (for all send-as addresses).
+
+    Returns:
+        List of send-as configurations with signatures
+    """
+    service = build_email_service()
+
+    result = service.users().settings().sendAs().list(userId="me").execute()
+
+    return result.get("sendAs", [])
+
+
+def create_auto_responder(
+    enabled: bool,
+    response_text: str,
+    start_time: Optional[str] = None,
+    end_time: Optional[str] = None,
+    response_subject: Optional[str] = None,
+) -> None:
+    """Create or update vacation auto-responder.
+
+    Args:
+        enabled: Whether auto-responder is active
+        response_text: Message to send in response
+        start_time: Start time (ISO8601 format, e.g., "2025-12-01T00:00:00Z")
+        end_time: End time (ISO8601 format)
+        response_subject: Subject line for auto-response (optional)
+    """
+    service = build_email_service()
+
+    vacation_settings = {
+        "enableAutoReply": enabled,
+        "responseBodyHtml": response_text,
+    }
+
+    if response_subject:
+        vacation_settings["responseSubject"] = response_subject
+
+    if start_time:
+        vacation_settings["startTime"] = start_time
+
+    if end_time:
+        vacation_settings["endTime"] = end_time
+
+    # Note: restrictToContacts and restrictToDomain can be added here for more control
+    vacation_settings["restrictToContacts"] = False  # Respond to all
+    vacation_settings["restrictToDomain"] = False    # Respond to all domains
+
+    service.users().settings().updateVacationSettings(userId="me", body=vacation_settings).execute()
+
+
+def get_auto_responder() -> Dict[str, Any]:
+    """Get current auto-responder/vacation settings.
+
+    Returns:
+        Vacation settings dict with enabled, response_text, start/end times, etc.
+    """
+    service = build_email_service()
+
+    return service.users().settings().getVacationSettings(userId="me").execute()
+
+
+def disable_auto_responder() -> None:
+    """Disable the auto-responder."""
+    service = build_email_service()
+
+    vacation_settings = {"enableAutoReply": False}
+
+    service.users().settings().updateVacationSettings(userId="me", body=vacation_settings).execute()
+
+
+def create_template(
+    name: str,
+    body: str,
+    subject: str = "",
+) -> str:
+    """Create a message template.
+
+    Note: Gmail API doesn't have native templates, so we store them as
+    drafts with a special naming convention: "__template__<name>"
+
+    Args:
+        name: Template name
+        body: Template body text
+        subject: Template subject line (optional)
+
+    Returns:
+        Draft ID of the template
+    """
+    service = build_email_service()
+
+    # Create a special draft that serves as a template
+    # Using a naming convention to identify templates
+    template_subject = f"__template__{name}"
+
+    message = MIMEText(body)
+    message["To"] = ""  # Empty - templates have no recipient
+    message["Subject"] = template_subject
+    message["X-Template-Name"] = name
+
+    raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
+
+    draft = service.users().drafts().create(
+        userId="me",
+        body={"message": {"raw": raw}},
+    ).execute()
+
+    return draft.get("id", "")
+
+
+def list_templates() -> List[Dict[str, Any]]:
+    """List all message templates.
+
+    Returns:
+        List of template objects (stored as special drafts)
+    """
+    service = build_email_service()
+
+    # Get all drafts and filter for templates
+    results = service.users().drafts().list(
+        userId="me",
+        maxResults=100,
+        q="subject:__template__",
+    ).execute()
+
+    drafts = results.get("drafts", [])
+    templates = []
+
+    for draft in drafts:
+        draft_id = draft.get("id")
+        msg = draft.get("message", {})
+        headers = parse_headers(msg.get("payload", {}).get("headers", []))
+        subject = headers.get("Subject", "")
+
+        # Extract template name from subject
+        if subject.startswith("__template__"):
+            template_name = subject.replace("__template__", "")
+            templates.append({
+                "id": draft_id,
+                "name": template_name,
+                "subject": headers.get("X-Template-Name", template_name),
+            })
+
+    return templates
+
+
+def get_template(template_id: str) -> Dict[str, Any]:
+    """Get a template by ID.
+
+    Args:
+        template_id: Template draft ID
+
+    Returns:
+        Template dict with name, subject, and body
+    """
+    service = build_email_service()
+
+    draft = service.users().drafts().get(userId="me", id=template_id, format="full").execute()
+
+    msg = draft.get("message", {})
+    headers = parse_headers(msg.get("payload", {}).get("headers", []))
+    body = extract_body(msg.get("payload", {}))
+    subject = headers.get("Subject", "")
+
+    template_name = subject.replace("__template__", "") if subject.startswith("__template__") else ""
+
+    return {
+        "id": template_id,
+        "name": template_name,
+        "subject": headers.get("X-Template-Name", ""),
+        "body": body,
+    }
+
+
+def delete_template(template_id: str) -> None:
+    """Delete a template.
+
+    Args:
+        template_id: Template draft ID to delete
+    """
+    service = build_email_service()
+
+    service.users().drafts().delete(userId="me", id=template_id).execute()
+
+
+def use_template(
+    template_id: str,
+    to: str,
+    subject_override: Optional[str] = None,
+) -> str:
+    """Create a draft from a template.
+
+    Args:
+        template_id: Template draft ID
+        to: Recipient email address
+        subject_override: Override template subject (optional)
+
+    Returns:
+        New draft ID
+    """
+    service = build_email_service()
+
+    # Get the template
+    template = get_template(template_id)
+    template_body = template.get("body", "")
+    template_subject = subject_override or template.get("subject", "")
+
+    # Create new draft with template content
+    message = MIMEText(template_body)
+    message["To"] = to
+    message["Subject"] = template_subject
+
+    raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
+
+    draft = service.users().drafts().create(
+        userId="me",
+        body={"message": {"raw": raw}},
+    ).execute()
+
+    return draft.get("id", "")

@@ -410,3 +410,201 @@ class TestBatchCommands:
         """Test batch-add-label without label name."""
         result = runner.invoke(email_cli.main, ["batch-add-label", "msg1"])
         assert result.exit_code != 0
+
+
+# ============================================================================
+# Phase 4: Advanced Features Tests
+# ============================================================================
+
+
+class TestFilterCommands:
+    """Test filter commands."""
+
+    def test_filters_group_help(self, runner):
+        """Test filters group help."""
+        result = runner.invoke(email_cli.main, ["filters", "--help"])
+        assert result.exit_code == 0
+        assert "Manage message filters/rules" in result.output
+
+    def test_filters_create_help(self, runner):
+        """Test filters create command help."""
+        result = runner.invoke(email_cli.main, ["filters", "create", "--help"])
+        assert result.exit_code == 0
+        assert "--from" in result.output
+        assert "--to" in result.output
+        assert "--subject" in result.output
+        assert "--action" in result.output
+
+    def test_filters_list_help(self, runner):
+        """Test filters list command help."""
+        result = runner.invoke(email_cli.main, ["filters", "list", "--help"])
+        assert result.exit_code == 0
+        assert "--output" in result.output
+
+    def test_filters_get_help(self, runner):
+        """Test filters get command help."""
+        result = runner.invoke(email_cli.main, ["filters", "get", "--help"])
+        assert result.exit_code == 0
+        assert "FILTER_ID" in result.output
+
+    def test_filters_delete_help(self, runner):
+        """Test filters delete command help."""
+        result = runner.invoke(email_cli.main, ["filters", "delete", "--help"])
+        assert result.exit_code == 0
+        assert "FILTER_ID" in result.output
+
+    def test_filters_create_missing_action(self, runner):
+        """Test filter create without --action."""
+        result = runner.invoke(
+            email_cli.main,
+            ["filters", "create", "Test", "--from", "user@example.com"],
+        )
+        assert result.exit_code != 0
+
+
+class TestSignatureCommands:
+    """Test signature commands."""
+
+    def test_signatures_group_help(self, runner):
+        """Test signatures group help."""
+        result = runner.invoke(email_cli.main, ["signatures", "--help"])
+        assert result.exit_code == 0
+        assert "Manage email signatures" in result.output
+
+    def test_signatures_list_help(self, runner):
+        """Test signatures list command help."""
+        result = runner.invoke(email_cli.main, ["signatures", "list", "--help"])
+        assert result.exit_code == 0
+        assert "--output" in result.output
+
+    def test_signatures_get_help(self, runner):
+        """Test signatures get command help."""
+        result = runner.invoke(email_cli.main, ["signatures", "get", "--help"])
+        assert result.exit_code == 0
+        assert "SEND_AS_EMAIL" in result.output
+
+    def test_signatures_update_help(self, runner):
+        """Test signatures update command help."""
+        result = runner.invoke(email_cli.main, ["signatures", "update", "--help"])
+        assert result.exit_code == 0
+        assert "SEND_AS_EMAIL" in result.output
+        assert "SIGNATURE_HTML" in result.output
+
+    def test_signatures_update_missing_args(self, runner):
+        """Test signatures update without arguments."""
+        result = runner.invoke(email_cli.main, ["signatures", "update"])
+        assert result.exit_code != 0
+
+
+class TestAutoResponderCommands:
+    """Test auto-responder commands."""
+
+    def test_auto_responder_group_help(self, runner):
+        """Test auto-responder group help."""
+        result = runner.invoke(email_cli.main, ["auto-responder", "--help"])
+        assert result.exit_code == 0
+        assert "Manage auto-responders" in result.output
+
+    def test_auto_responder_create_help(self, runner):
+        """Test auto-responder create command help."""
+        result = runner.invoke(email_cli.main, ["auto-responder", "create", "--help"])
+        assert result.exit_code == 0
+        assert "--subject" in result.output
+        assert "--message" in result.output
+        assert "--start-date" in result.output
+        assert "--end-date" in result.output
+
+    def test_auto_responder_get_help(self, runner):
+        """Test auto-responder get command help."""
+        result = runner.invoke(email_cli.main, ["auto-responder", "get", "--help"])
+        assert result.exit_code == 0
+        assert "--output" in result.output
+
+    def test_auto_responder_disable_help(self, runner):
+        """Test auto-responder disable command help."""
+        result = runner.invoke(email_cli.main, ["auto-responder", "disable", "--help"])
+        assert result.exit_code == 0
+
+    def test_auto_responder_create_missing_subject(self, runner):
+        """Test auto-responder create without --subject."""
+        result = runner.invoke(
+            email_cli.main,
+            ["auto-responder", "create", "--message", "Out of office"],
+        )
+        assert result.exit_code != 0
+
+    def test_auto_responder_create_missing_message(self, runner):
+        """Test auto-responder create without --message."""
+        result = runner.invoke(
+            email_cli.main,
+            ["auto-responder", "create", "--subject", "OOO"],
+        )
+        assert result.exit_code != 0
+
+
+class TestTemplateCommands:
+    """Test template commands."""
+
+    def test_templates_group_help(self, runner):
+        """Test templates group help."""
+        result = runner.invoke(email_cli.main, ["templates", "--help"])
+        assert result.exit_code == 0
+        assert "Manage message templates" in result.output
+
+    def test_templates_create_help(self, runner):
+        """Test templates create command help."""
+        result = runner.invoke(email_cli.main, ["templates", "create", "--help"])
+        assert result.exit_code == 0
+        assert "--subject" in result.output
+        assert "--body" in result.output
+
+    def test_templates_list_help(self, runner):
+        """Test templates list command help."""
+        result = runner.invoke(email_cli.main, ["templates", "list", "--help"])
+        assert result.exit_code == 0
+        assert "--output" in result.output
+
+    def test_templates_get_help(self, runner):
+        """Test templates get command help."""
+        result = runner.invoke(email_cli.main, ["templates", "get", "--help"])
+        assert result.exit_code == 0
+        assert "TEMPLATE_ID" in result.output
+
+    def test_templates_delete_help(self, runner):
+        """Test templates delete command help."""
+        result = runner.invoke(email_cli.main, ["templates", "delete", "--help"])
+        assert result.exit_code == 0
+        assert "TEMPLATE_ID" in result.output
+
+    def test_templates_use_help(self, runner):
+        """Test templates use command help."""
+        result = runner.invoke(email_cli.main, ["templates", "use", "--help"])
+        assert result.exit_code == 0
+        assert "TEMPLATE_ID" in result.output
+        assert "--to" in result.output
+        assert "--cc" in result.output
+        assert "--bcc" in result.output
+
+    def test_templates_create_missing_subject(self, runner):
+        """Test templates create without --subject."""
+        result = runner.invoke(
+            email_cli.main,
+            ["templates", "create", "Test", "--body", "Test body"],
+        )
+        assert result.exit_code != 0
+
+    def test_templates_create_missing_body(self, runner):
+        """Test templates create without --body."""
+        result = runner.invoke(
+            email_cli.main,
+            ["templates", "create", "Test", "--subject", "Test subject"],
+        )
+        assert result.exit_code != 0
+
+    def test_templates_use_missing_to(self, runner):
+        """Test templates use without --to."""
+        result = runner.invoke(
+            email_cli.main,
+            ["templates", "use", "template123"],
+        )
+        assert result.exit_code != 0
