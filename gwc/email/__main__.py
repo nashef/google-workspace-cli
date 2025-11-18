@@ -13,6 +13,16 @@ from gwc.email.operations import (
     get_label_map,
     get_message_threads,
     get_common_search_examples,
+    # Phase 2: Compose operations
+    send_message,
+    create_draft,
+    list_drafts,
+    get_draft,
+    send_draft,
+    update_draft,
+    delete_draft,
+    reply_to_message,
+    forward_message,
 )
 from gwc.shared.output import format_output
 
@@ -20,6 +30,12 @@ from gwc.shared.output import format_output
 @click.group()
 def main():
     """Gmail CLI (gwc-email)."""
+    pass
+
+
+@main.group()
+def draft():
+    """Manage draft messages."""
     pass
 
 
@@ -316,6 +332,201 @@ def thread(thread_id: str, output: str):
 
     except Exception as e:
         click.echo(f"Error getting thread: {e}", err=True)
+        raise click.Abort()
+
+
+# ============================================================================
+# Compose Commands (Phase 2)
+# ============================================================================
+
+
+@main.command()
+@click.option("--to", required=True, help="Recipient email address (required)")
+@click.option("--subject", required=True, help="Message subject (required)")
+@click.option("--body", required=True, help="Message body (required)")
+@click.option("--cc", default="", help="CC recipients (comma-separated)")
+@click.option("--bcc", default="", help="BCC recipients (comma-separated)")
+@click.option(
+    "--attachments",
+    multiple=True,
+    help="File paths to attach (can specify multiple times)",
+)
+def send(to: str, subject: str, body: str, cc: str, bcc: str, attachments):
+    """Send a message directly (no draft).
+
+    Examples:
+        gwc-email send --to alice@example.com --subject "Hello" --body "Hi there!"
+        gwc-email send --to alice@example.com --subject "Report" --body "See attached" \\
+          --attachments /path/to/file.pdf
+    """
+    try:
+        message_id = send_message(to, subject, body, cc, bcc, list(attachments))
+        click.echo(f"Message sent! ID: {message_id}")
+    except FileNotFoundError as e:
+        click.echo(f"Error: {e}", err=True)
+        raise click.Abort()
+    except Exception as e:
+        click.echo(f"Error sending message: {e}", err=True)
+        raise click.Abort()
+
+
+@draft.command("create")
+@click.option("--to", required=True, help="Recipient email address (required)")
+@click.option("--subject", required=True, help="Message subject (required)")
+@click.option("--body", required=True, help="Message body (required)")
+@click.option("--cc", default="", help="CC recipients (comma-separated)")
+@click.option("--bcc", default="", help="BCC recipients (comma-separated)")
+@click.option(
+    "--attachments",
+    multiple=True,
+    help="File paths to attach (can specify multiple times)",
+)
+def draft_create(to: str, subject: str, body: str, cc: str, bcc: str, attachments):
+    """Create a draft message (unsent).
+
+    Examples:
+        gwc-email draft create --to alice@example.com --subject "Hello" --body "Draft message"
+        gwc-email draft create --to alice@example.com --subject "Report" --body "Draft" \\
+          --attachments /path/to/file.pdf
+    """
+    try:
+        draft_id = create_draft(to, subject, body, cc, bcc, list(attachments))
+        click.echo(f"Draft created! ID: {draft_id}")
+    except FileNotFoundError as e:
+        click.echo(f"Error: {e}", err=True)
+        raise click.Abort()
+    except Exception as e:
+        click.echo(f"Error creating draft: {e}", err=True)
+        raise click.Abort()
+
+
+@draft.command("list")
+@click.option("--limit", default=10, type=int, help="Max drafts to return (1-100)")
+@click.option(
+    "--output",
+    type=click.Choice(["unix", "json", "llm"]),
+    default="unix",
+    help="Output format",
+)
+def draft_list(limit: int, output: str):
+    """List all draft messages."""
+    try:
+        drafts = list_drafts(max_results=limit)
+
+        if not drafts:
+            click.echo("No drafts found.")
+            return
+
+        data = []
+        for d in drafts:
+            msg = d.get("message", {})
+            data.append(
+                {
+                    "id": d.get("id"),
+                    "messageId": msg.get("id"),
+                    "snippet": msg.get("snippet", "")[:80],
+                    "date": msg.get("internalDate", ""),
+                }
+            )
+
+        click.echo(format_output(data, output))
+
+    except Exception as e:
+        click.echo(f"Error listing drafts: {e}", err=True)
+        raise click.Abort()
+
+
+@draft.command("get")
+@click.argument("draft_id")
+@click.option(
+    "--output",
+    type=click.Choice(["unix", "json", "llm"]),
+    default="unix",
+    help="Output format",
+)
+def draft_get(draft_id: str, output: str):
+    """Get a draft message details."""
+    try:
+        d = get_draft(draft_id)
+        msg = d.get("message", {})
+
+        # Format similar to message display
+        data = [
+            {
+                "id": d.get("id"),
+                "messageId": msg.get("id"),
+                "snippet": msg.get("snippet", ""),
+                "date": msg.get("internalDate", ""),
+            }
+        ]
+
+        click.echo(format_output(data, output))
+
+    except Exception as e:
+        click.echo(f"Error getting draft: {e}", err=True)
+        raise click.Abort()
+
+
+@draft.command("send")
+@click.argument("draft_id")
+def draft_send(draft_id: str):
+    """Send an existing draft."""
+    try:
+        message_id = send_draft(draft_id)
+        click.echo(f"Draft sent! Message ID: {message_id}")
+    except Exception as e:
+        click.echo(f"Error sending draft: {e}", err=True)
+        raise click.Abort()
+
+
+@draft.command("delete")
+@click.argument("draft_id")
+def draft_delete(draft_id: str):
+    """Delete a draft message."""
+    try:
+        delete_draft(draft_id)
+        click.echo(f"Draft {draft_id} deleted.")
+    except Exception as e:
+        click.echo(f"Error deleting draft: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("message_id")
+@click.option("--reply-all", is_flag=True, help="Reply to all recipients")
+@click.option("--body", required=True, help="Reply message body")
+def reply(message_id: str, reply_all: bool, body: str):
+    """Reply to a message.
+
+    Examples:
+        gwc-email reply msg123 --body "Thanks for your message!"
+        gwc-email reply msg123 --reply-all --body "Everyone, please see below."
+    """
+    try:
+        message_id = reply_to_message(message_id, body, all_recipients=reply_all)
+        click.echo(f"Reply sent! Message ID: {message_id}")
+    except Exception as e:
+        click.echo(f"Error sending reply: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("message_id")
+@click.option("--to", required=True, help="Recipient to forward to")
+@click.option("--subject", default="", help="Custom subject (optional)")
+@click.option("--body", default="", help="Additional text to include (optional)")
+def forward(message_id: str, to: str, subject: str, body: str):
+    """Forward a message to recipients.
+
+    Examples:
+        gwc-email forward msg123 --to alice@example.com
+        gwc-email forward msg123 --to alice@example.com --body "Please see this."
+    """
+    try:
+        message_id = forward_message(message_id, to, subject, body)
+        click.echo(f"Message forwarded! ID: {message_id}")
+    except Exception as e:
+        click.echo(f"Error forwarding message: {e}", err=True)
         raise click.Abort()
 
 

@@ -159,3 +159,124 @@ class TestErrorHandling:
             ["list", "--limit", "not_a_number"],
         )
         assert result.exit_code != 0
+
+
+# ============================================================================
+# Phase 2: Compose Commands Tests
+# ============================================================================
+
+
+class TestComposeCommands:
+    """Test message composition commands."""
+
+    def test_send_help(self, runner):
+        """Test send command help."""
+        result = runner.invoke(email_cli.main, ["send", "--help"])
+        assert result.exit_code == 0
+        assert "--to" in result.output
+        assert "--subject" in result.output
+        assert "--body" in result.output
+
+    def test_send_missing_required_options(self, runner):
+        """Test send without required options."""
+        result = runner.invoke(email_cli.main, ["send"])
+        assert result.exit_code != 0
+
+    def test_send_missing_to(self, runner):
+        """Test send without --to option."""
+        result = runner.invoke(
+            email_cli.main,
+            ["send", "--subject", "Test", "--body", "Test body"],
+        )
+        assert result.exit_code != 0
+
+    def test_send_with_attachments_help(self, runner):
+        """Test that send accepts --attachments option."""
+        result = runner.invoke(email_cli.main, ["send", "--help"])
+        assert result.exit_code == 0
+        assert "--attachments" in result.output
+
+
+class TestDraftCommands:
+    """Test draft commands."""
+
+    def test_draft_group_help(self, runner):
+        """Test draft group help."""
+        result = runner.invoke(email_cli.main, ["draft", "--help"])
+        assert result.exit_code == 0
+        assert "Manage draft" in result.output
+
+    def test_draft_create_help(self, runner):
+        """Test draft create command help."""
+        result = runner.invoke(email_cli.main, ["draft", "create", "--help"])
+        assert result.exit_code == 0
+        assert "--to" in result.output
+        assert "--subject" in result.output
+        assert "--body" in result.output
+
+    def test_draft_list_help(self, runner):
+        """Test draft list command help."""
+        result = runner.invoke(email_cli.main, ["draft", "list", "--help"])
+        assert result.exit_code == 0
+        assert "--limit" in result.output
+        assert "--output" in result.output
+
+    def test_draft_get_help(self, runner):
+        """Test draft get command help."""
+        result = runner.invoke(email_cli.main, ["draft", "get", "--help"])
+        assert result.exit_code == 0
+        assert "DRAFT_ID" in result.output
+
+    def test_draft_send_help(self, runner):
+        """Test draft send command help."""
+        result = runner.invoke(email_cli.main, ["draft", "send", "--help"])
+        assert result.exit_code == 0
+        assert "DRAFT_ID" in result.output
+
+    def test_draft_delete_help(self, runner):
+        """Test draft delete command help."""
+        result = runner.invoke(email_cli.main, ["draft", "delete", "--help"])
+        assert result.exit_code == 0
+        assert "DRAFT_ID" in result.output
+
+    def test_draft_create_missing_required(self, runner):
+        """Test draft create without required options."""
+        result = runner.invoke(email_cli.main, ["draft", "create"])
+        assert result.exit_code != 0
+
+
+class TestReplyForwardCommands:
+    """Test reply and forward commands."""
+
+    def test_reply_help(self, runner):
+        """Test reply command help."""
+        result = runner.invoke(email_cli.main, ["reply", "--help"])
+        assert result.exit_code == 0
+        assert "MESSAGE_ID" in result.output
+        assert "--body" in result.output
+        assert "--reply-all" in result.output
+
+    def test_reply_missing_body(self, runner):
+        """Test reply without --body."""
+        result = runner.invoke(email_cli.main, ["reply", "msg123"])
+        assert result.exit_code != 0
+
+    def test_forward_help(self, runner):
+        """Test forward command help."""
+        result = runner.invoke(email_cli.main, ["forward", "--help"])
+        assert result.exit_code == 0
+        assert "MESSAGE_ID" in result.output
+        assert "--to" in result.output
+
+    def test_forward_missing_to(self, runner):
+        """Test forward without --to."""
+        result = runner.invoke(email_cli.main, ["forward", "msg123"])
+        assert result.exit_code != 0
+
+    def test_forward_missing_message_id(self, runner):
+        """Test forward without message ID."""
+        result = runner.invoke(
+            email_cli.main,
+            ["forward", "--to", "alice@example.com"],
+        )
+        assert result.exit_code != 0

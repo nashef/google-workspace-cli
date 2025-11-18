@@ -1,6 +1,12 @@
 """Gmail API operations for gwc-email."""
 
 import base64
+import os
+import mimetypes
+from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
+from email.mime.multipart import MIMEMultipart
+from email import encoders
 from typing import Any, Dict, List, Optional
 from functools import lru_cache
 from googleapiclient.discovery import build, Resource
@@ -293,3 +299,343 @@ def get_common_search_examples() -> Dict[str, str]:
         "filename": "filename:pdf",
         "in_label": "label:Important",
     }
+
+
+# ============================================================================
+# Message Composition & Sending
+# ============================================================================
+
+
+def create_message(
+    to: str,
+    subject: str,
+    body: str,
+    cc: str = "",
+    bcc: str = "",
+    attachments: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """Create a message object for sending.
+
+    Args:
+        to: Recipient email address (required)
+        subject: Message subject (required)
+        body: Message body (plain text)
+        cc: CC recipients (comma-separated)
+        bcc: BCC recipients (comma-separated)
+        attachments: List of file paths to attach
+
+    Returns:
+        Message dict ready for sending to Gmail API
+    """
+    if attachments is None:
+        attachments = []
+
+    if attachments:
+        message = MIMEMultipart()
+    else:
+        message = MIMEText(body)
+        message["To"] = to
+        message["Subject"] = subject
+        if cc:
+            message["Cc"] = cc
+        if bcc:
+            message["Bcc"] = bcc
+
+        return {"raw": base64.urlsafe_b64encode(message.as_bytes()).decode()}
+
+    # Handle multipart with attachments
+    message["To"] = to
+    message["Subject"] = subject
+    if cc:
+        message["Cc"] = cc
+    if bcc:
+        message["Bcc"] = bcc
+
+    # Add body
+    message.attach(MIMEText(body, "plain"))
+
+    # Add attachments
+    for file_path in attachments:
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"Attachment not found: {file_path}")
+
+        filename = os.path.basename(file_path)
+        mime_type, encoding = mimetypes.guess_type(file_path)
+
+        if mime_type is None:
+            mime_type = "application/octet-stream"
+
+        maintype, subtype = mime_type.split("/", 1)
+
+        try:
+            with open(file_path, "rb") as attachment:
+                part = MIMEBase(maintype, subtype)
+                part.set_payload(attachment.read())
+
+            encoders.encode_base64(part)
+            part.add_header("Content-Disposition", "attachment", filename=filename)
+            message.attach(part)
+
+        except Exception as e:
+            raise IOError(f"Failed to attach {file_path}: {e}")
+
+    return {"raw": base64.urlsafe_b64encode(message.as_bytes()).decode()}
+
+
+def send_message(
+    to: str,
+    subject: str,
+    body: str,
+    cc: str = "",
+    bcc: str = "",
+    attachments: Optional[List[str]] = None,
+) -> str:
+    """Send a message directly (no draft).
+
+    Args:
+        to: Recipient email address
+        subject: Message subject
+        body: Message body
+        cc: CC recipients
+        bcc: BCC recipients
+        attachments: List of file paths to attach
+
+    Returns:
+        Message ID of sent message
+    """
+    service = build_email_service()
+
+    message = create_message(to, subject, body, cc, bcc, attachments)
+
+    result = service.users().messages().send(userId="me", body=message).execute()
+
+    return result.get("id", "")
+
+
+def create_draft(
+    to: str,
+    subject: str,
+    body: str,
+    cc: str = "",
+    bcc: str = "",
+    attachments: Optional[List[str]] = None,
+) -> str:
+    """Create a draft message (unsent).
+
+    Args:
+        to: Recipient email address
+        subject: Message subject
+        body: Message body
+        cc: CC recipients
+        bcc: BCC recipients
+        attachments: List of file paths to attach
+
+    Returns:
+        Draft ID
+    """
+    service = build_email_service()
+
+    message = create_message(to, subject, body, cc, bcc, attachments)
+
+    draft = service.users().drafts().create(userId="me", body={"message": message}).execute()
+
+    return draft.get("id", "")
+
+
+def list_drafts(max_results: int = 10) -> List[Dict[str, Any]]:
+    """List all draft messages.
+
+    Args:
+        max_results: Max drafts to return
+
+    Returns:
+        List of draft objects
+    """
+    service = build_email_service()
+
+    results = service.users().drafts().list(
+        userId="me",
+        maxResults=min(max_results, 100),
+        fields="drafts(id,message(id,threadId,snippet,internalDate))",
+    ).execute()
+
+    return results.get("drafts", [])
+
+
+def get_draft(draft_id: str) -> Dict[str, Any]:
+    """Get a draft message.
+
+    Args:
+        draft_id: Draft ID
+
+    Returns:
+        Draft object with full message content
+    """
+    service = build_email_service()
+
+    return service.users().drafts().get(userId="me", id=draft_id, format="full").execute()
+
+
+def send_draft(draft_id: str) -> str:
+    """Send an existing draft.
+
+    Args:
+        draft_id: Draft ID to send
+
+    Returns:
+        Message ID of sent message
+    """
+    service = build_email_service()
+
+    result = service.users().drafts().send(userId="me", body={"id": draft_id}).execute()
+
+    return result.get("id", "")
+
+
+def update_draft(
+    draft_id: str,
+    to: str,
+    subject: str,
+    body: str,
+    cc: str = "",
+    bcc: str = "",
+    attachments: Optional[List[str]] = None,
+) -> str:
+    """Update/replace a draft message.
+
+    Args:
+        draft_id: Draft ID to update
+        to: Recipient email address
+        subject: Message subject
+        body: Message body
+        cc: CC recipients
+        bcc: BCC recipients
+        attachments: List of file paths to attach
+
+    Returns:
+        Updated draft ID
+    """
+    service = build_email_service()
+
+    message = create_message(to, subject, body, cc, bcc, attachments)
+
+    result = service.users().drafts().update(
+        userId="me",
+        id=draft_id,
+        body={"message": message},
+    ).execute()
+
+    return result.get("id", "")
+
+
+def delete_draft(draft_id: str) -> None:
+    """Delete a draft message.
+
+    Args:
+        draft_id: Draft ID to delete
+    """
+    service = build_email_service()
+    service.users().drafts().delete(userId="me", id=draft_id).execute()
+
+
+def reply_to_message(
+    message_id: str,
+    reply_body: str,
+    all_recipients: bool = False,
+) -> str:
+    """Reply to a message.
+
+    Args:
+        message_id: Message ID to reply to
+        reply_body: Reply message body
+        all_recipients: If True, reply to all; if False, reply to sender only
+
+    Returns:
+        Message ID of reply
+    """
+    service = build_email_service()
+
+    # Get original message
+    original = get_message(message_id)
+    headers = parse_headers(original.get("payload", {}).get("headers", []))
+
+    # Get recipient
+    from_addr = headers.get("From", "")
+    subject = headers.get("Subject", "(no subject)")
+    thread_id = original.get("threadId")
+
+    # Create reply subject
+    if not subject.startswith("Re:"):
+        reply_subject = f"Re: {subject}"
+    else:
+        reply_subject = subject
+
+    # Create reply message
+    if all_recipients:
+        # Reply to all
+        to = from_addr
+        cc = headers.get("Cc", "")
+    else:
+        # Reply to sender only
+        to = from_addr
+        cc = ""
+
+    message = create_message(to, reply_subject, reply_body, cc)
+
+    # Send in thread
+    result = service.users().messages().send(
+        userId="me",
+        body=message,
+    ).execute()
+
+    return result.get("id", "")
+
+
+def forward_message(
+    message_id: str,
+    to: str,
+    subject: str = "",
+    body: str = "",
+) -> str:
+    """Forward a message to recipients.
+
+    Args:
+        message_id: Message ID to forward
+        to: Recipient to forward to
+        subject: Custom subject (optional)
+        body: Additional text to include (optional)
+
+    Returns:
+        Message ID of forwarded message
+    """
+    service = build_email_service()
+
+    # Get original message
+    original = get_message(message_id)
+    headers = parse_headers(original.get("payload", {}).get("headers", []))
+    original_subject = headers.get("Subject", "(no subject)")
+
+    # Create forward subject
+    if not subject:
+        if not original_subject.startswith("Fwd:"):
+            subject = f"Fwd: {original_subject}"
+        else:
+            subject = original_subject
+
+    # Create forward message
+    original_from = headers.get("From", "Unknown")
+    original_date = headers.get("Date", "")
+    original_body = extract_body(original.get("payload", {}))
+
+    forward_text = body + "\n\n" if body else ""
+    forward_text += f"---------- Forwarded message --------- \nFrom: {original_from}\nDate: {original_date}\nSubject: {original_subject}\n\n{original_body}"
+
+    message = create_message(to, subject, forward_text)
+
+    # Send forward
+    result = service.users().messages().send(
+        userId="me",
+        body=message,
+    ).execute()
+
+    return result.get("id", "")
