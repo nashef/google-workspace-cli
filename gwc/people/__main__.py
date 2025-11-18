@@ -7,6 +7,7 @@ from ..shared.exceptions import GwcError, AuthenticationError, ValidationError
 from ..shared.output import OutputFormat, format_output
 from ..shared.auth import authenticate_interactive, refresh_token
 from . import operations
+from .cache import ContactCache
 
 
 @click.group()
@@ -341,6 +342,110 @@ def delete(email_or_id, confirm):
     except ValidationError as e:
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
+    except GwcError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@main.group()
+def cache():
+    """Manage contact cache and sync.
+
+    Examples:
+        gwc-people cache list
+        gwc-people cache sync
+        gwc-people cache clear
+    """
+    pass
+
+
+@cache.command()
+def list():
+    """Show cache statistics."""
+    try:
+        cache_obj = ContactCache()
+        stats = cache_obj.get_cache_stats()
+
+        click.echo(f"Cache Statistics:")
+        click.echo(f"  Contacts cached: {stats['contact_count']}")
+        click.echo(f"  Cache size: {stats['cache_size_bytes']:,} bytes")
+
+        if stats['last_sync_time']:
+            click.echo(f"  Last sync: {stats['last_sync_time']}")
+        else:
+            click.echo(f"  Last sync: Never")
+
+        if stats['should_sync']:
+            click.echo(f"  Status: Needs sync (>24 hours old)")
+        else:
+            click.echo(f"  Status: Up to date")
+
+    except GwcError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@cache.command()
+@click.option(
+    '--force',
+    is_flag=True,
+    help='Force full sync instead of incremental'
+)
+def sync(force):
+    """Sync contacts from Google Contacts to local cache.
+
+    Uses sync tokens for efficient incremental updates.
+    Falls back to full sync if token expires.
+
+    Examples:
+        gwc-people cache sync
+        gwc-people cache sync --force
+    """
+    try:
+        cache_obj = ContactCache()
+        click.echo("Syncing contacts...")
+
+        result = operations.sync_contacts(cache=cache_obj, force_full=force)
+
+        if result['full_sync']:
+            click.echo(f"Full sync completed: {result['contacts_synced']} contacts cached")
+        else:
+            click.echo(f"Incremental sync completed: {result['contacts_synced']} contacts updated")
+
+        if result['sync_token']:
+            click.echo(f"Sync token updated for next incremental sync")
+
+        stats = cache_obj.get_cache_stats()
+        click.echo(f"Total contacts in cache: {stats['contact_count']}")
+
+    except GwcError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@cache.command()
+@click.option(
+    '--confirm',
+    is_flag=True,
+    help='Confirm clearing without prompting'
+)
+def clear(confirm):
+    """Clear local contact cache.
+
+    Examples:
+        gwc-people cache clear
+        gwc-people cache clear --confirm
+    """
+    try:
+        if not confirm:
+            if not click.confirm("This will clear all cached contacts. Continue?"):
+                click.echo("Cache clear cancelled.")
+                return
+
+        cache_obj = ContactCache()
+        cache_obj.clear_cache()
+        click.echo("Cache cleared successfully.")
+
     except GwcError as e:
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)

@@ -6,6 +6,7 @@ from googleapiclient.errors import HttpError
 
 from ..shared.auth import get_credentials, PEOPLE_SCOPES
 from ..shared.exceptions import APIError, ValidationError
+from .cache import ContactCache
 
 
 def build_people_service():
@@ -535,3 +536,65 @@ def delete_contact_batch(resource_names: List[str]) -> List[Dict[str, Any]]:
         return result.get('responses', [])
     except HttpError as e:
         raise APIError(f"Failed to batch delete contacts: {e}")
+
+
+def sync_contacts(cache: Optional[ContactCache] = None, force_full: bool = False) -> Dict[str, Any]:
+    """Sync contacts from Google using sync tokens for incremental updates.
+
+    Args:
+        cache: ContactCache instance. If None, creates a new one.
+        force_full: If True, perform full sync instead of incremental
+
+    Returns:
+        Dict with sync results (contacts_synced, sync_token, full_sync)
+
+    Raises:
+        APIError: If sync fails
+    """
+    if cache is None:
+        cache = ContactCache()
+
+    service = build_people_service()
+
+    # Get last sync token if not forcing full sync
+    sync_token = None if force_full else cache.get_sync_token()
+    is_incremental = sync_token is not None
+
+    try:
+        # Prepare request kwargs
+        kwargs = {
+            'resourceName': 'people/me',
+            'personFields': 'names,emailAddresses,phoneNumbers,organizations,metadata'
+        }
+
+        if sync_token:
+            kwargs['syncToken'] = sync_token
+        else:
+            # For full sync, use maxDeletions to get deletion info
+            kwargs['requestSyncToken'] = True
+
+        result = service.people().connections().list(**kwargs).execute()
+
+        # Cache the contacts
+        connections = result.get('connections', [])
+        cache.cache_contacts(connections)
+
+        # Update sync token if available
+        # nextSyncToken is returned when requestSyncToken=True or when using syncToken
+        next_sync_token = result.get('nextSyncToken')
+        if next_sync_token:
+            cache.set_sync_token(next_sync_token)
+
+        return {
+            'contacts_synced': len(connections),
+            'sync_token': next_sync_token,
+            'full_sync': not is_incremental,
+            'has_more': 'nextPageToken' in result
+        }
+
+    except HttpError as e:
+        if e.resp.status == 410:
+            # Sync token expired, fall back to full sync
+            if not force_full:
+                return sync_contacts(cache=cache, force_full=True)
+        raise APIError(f"Failed to sync contacts: {e}")
