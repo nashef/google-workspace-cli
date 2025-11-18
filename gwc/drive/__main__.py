@@ -24,6 +24,18 @@ from gwc.drive.operations import (
     guess_mime_type,
     get_mime_types,
     get_export_mime_types,
+    create_permission,
+    get_permission,
+    list_permissions,
+    update_permission,
+    delete_permission,
+    create_drive,
+    get_drive,
+    list_drives,
+    update_drive,
+    delete_drive,
+    hide_drive,
+    unhide_drive,
 )
 from gwc.shared.output import format_output, OutputFormat
 
@@ -470,6 +482,290 @@ def export_formats_cmd():
         click.echo(f"\n{doc_type.upper()}:")
         for format_name, mime_type in export_formats.items():
             click.echo(f"  {format_name:15} {mime_type}")
+
+
+# ============================================================================
+# Phase 2: Permissions (Access Control)
+# ============================================================================
+
+
+@main.command()
+@click.argument("file_id")
+@click.option("--email", required=True, help="User or group email (or domain for domain permission)")
+@click.option("--role", default="reader", help="Role: owner, organizer, writer, commenter, reader")
+@click.option("--type", "permission_type", default="user", help="Type: user, group, domain, or anyone")
+@click.option("--send-notification/--no-send-notification", default=True, help="Send notification email")
+@click.option("--transfer-ownership/--no-transfer-ownership", default=False, help="Transfer ownership")
+@click.option(
+    "--output",
+    type=click.Choice(["unix", "json", "llm"]),
+    default="unix",
+    help="Output format",
+)
+def create_permission_cmd(file_id, email, role, permission_type, send_notification, transfer_ownership, output):
+    """Create a permission (share a file or folder).
+
+    Examples:
+        gwc-drive create-permission file_id --email user@example.com --role reader
+        gwc-drive create-permission file_id --email user@example.com --role editor
+        gwc-drive create-permission file_id --email example.com --type domain --role reader
+    """
+    try:
+        perm_id = create_permission(
+            file_id=file_id,
+            email_or_domain=email,
+            role=role,
+            permission_type=permission_type,
+            send_notification=send_notification,
+            transfer_ownership=transfer_ownership,
+        )
+        result = {"id": perm_id, "email": email, "role": role, "type": permission_type}
+        click.echo(format_output([result], output))
+    except Exception as e:
+        click.echo(f"Error creating permission: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("file_id")
+@click.argument("permission_id")
+@click.option(
+    "--output",
+    type=click.Choice(["unix", "json", "llm"]),
+    default="unix",
+    help="Output format",
+)
+def get_permission_cmd(file_id, permission_id, output):
+    """Get a specific permission.
+
+    Examples:
+        gwc-drive get-permission file_id permission_id --output llm
+    """
+    try:
+        perm = get_permission(file_id, permission_id)
+        click.echo(format_output([perm], output))
+    except Exception as e:
+        click.echo(f"Error getting permission: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("file_id")
+@click.option(
+    "--output",
+    type=click.Choice(["unix", "json", "llm"]),
+    default="unix",
+    help="Output format",
+)
+def list_permissions_cmd(file_id, output):
+    """List all permissions on a file or folder.
+
+    Examples:
+        gwc-drive list-permissions file_id --output llm
+    """
+    try:
+        perms = list_permissions(file_id)
+        click.echo(format_output(perms, output))
+    except Exception as e:
+        click.echo(f"Error listing permissions: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("file_id")
+@click.argument("permission_id")
+@click.option("--role", help="New role: owner, organizer, writer, commenter, reader")
+@click.option(
+    "--output",
+    type=click.Choice(["unix", "json", "llm"]),
+    default="unix",
+    help="Output format",
+)
+def update_permission_cmd(file_id, permission_id, role, output):
+    """Update a permission (change role).
+
+    Examples:
+        gwc-drive update-permission file_id permission_id --role editor
+    """
+    try:
+        perm = update_permission(file_id, permission_id, role=role)
+        click.echo(format_output([perm], output))
+    except Exception as e:
+        click.echo(f"Error updating permission: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("file_id")
+@click.argument("permission_id")
+def delete_permission_cmd(file_id, permission_id):
+    """Delete a permission (revoke access).
+
+    Examples:
+        gwc-drive delete-permission file_id permission_id
+    """
+    try:
+        perm_id = delete_permission(file_id, permission_id)
+        click.echo(f"Permission {perm_id} deleted.")
+    except Exception as e:
+        click.echo(f"Error deleting permission: {e}", err=True)
+        raise click.Abort()
+
+
+# ============================================================================
+# Phase 2: Shared Drives
+# ============================================================================
+
+
+@main.command()
+@click.option("--name", required=True, help="Shared drive name")
+@click.option(
+    "--output",
+    type=click.Choice(["unix", "json", "llm"]),
+    default="unix",
+    help="Output format",
+)
+def create_drive_cmd(name, output):
+    """Create a new shared drive.
+
+    Examples:
+        gwc-drive create-drive --name "Team Drive"
+    """
+    try:
+        drive_id = create_drive(name=name)
+        result = {"id": drive_id, "name": name}
+        click.echo(format_output([result], output))
+    except Exception as e:
+        click.echo(f"Error creating drive: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("drive_id")
+@click.option(
+    "--output",
+    type=click.Choice(["unix", "json", "llm"]),
+    default="unix",
+    help="Output format",
+)
+def get_drive_cmd(drive_id, output):
+    """Get shared drive metadata.
+
+    Examples:
+        gwc-drive get-drive drive_id --output llm
+    """
+    try:
+        drive = get_drive(drive_id)
+        click.echo(format_output([drive], output))
+    except Exception as e:
+        click.echo(f"Error getting drive: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.option("--limit", default=10, type=int, help="Max results (1-100)")
+@click.option(
+    "--output",
+    type=click.Choice(["unix", "json", "llm"]),
+    default="unix",
+    help="Output format",
+)
+def list_drives_cmd(limit, output):
+    """List shared drives.
+
+    Examples:
+        gwc-drive list-drives --output llm
+        gwc-drive list-drives --limit 50 --output json
+    """
+    try:
+        drives = list_drives(limit=limit)
+        click.echo(format_output(drives, output))
+    except Exception as e:
+        click.echo(f"Error listing drives: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("drive_id")
+@click.option("--name", help="New drive name")
+@click.option(
+    "--output",
+    type=click.Choice(["unix", "json", "llm"]),
+    default="unix",
+    help="Output format",
+)
+def update_drive_cmd(drive_id, name, output):
+    """Update shared drive metadata.
+
+    Examples:
+        gwc-drive update-drive drive_id --name "New Name"
+    """
+    try:
+        drive = update_drive(drive_id, name=name)
+        click.echo(format_output([drive], output))
+    except Exception as e:
+        click.echo(f"Error updating drive: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("drive_id")
+def delete_drive_cmd(drive_id):
+    """Permanently delete a shared drive.
+
+    Examples:
+        gwc-drive delete-drive drive_id
+    """
+    try:
+        result_id = delete_drive(drive_id)
+        click.echo(f"Drive {result_id} deleted.")
+    except Exception as e:
+        click.echo(f"Error deleting drive: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("drive_id")
+@click.option(
+    "--output",
+    type=click.Choice(["unix", "json", "llm"]),
+    default="unix",
+    help="Output format",
+)
+def hide_drive_cmd(drive_id, output):
+    """Hide shared drive from default view.
+
+    Examples:
+        gwc-drive hide-drive drive_id
+    """
+    try:
+        drive = hide_drive(drive_id)
+        click.echo(format_output([drive], output))
+    except Exception as e:
+        click.echo(f"Error hiding drive: {e}", err=True)
+        raise click.Abort()
+
+
+@main.command()
+@click.argument("drive_id")
+@click.option(
+    "--output",
+    type=click.Choice(["unix", "json", "llm"]),
+    default="unix",
+    help="Output format",
+)
+def unhide_drive_cmd(drive_id, output):
+    """Restore shared drive to default view.
+
+    Examples:
+        gwc-drive unhide-drive drive_id
+    """
+    try:
+        drive = unhide_drive(drive_id)
+        click.echo(format_output([drive], output))
+    except Exception as e:
+        click.echo(f"Error unhiding drive: {e}", err=True)
+        raise click.Abort()
 
 
 if __name__ == "__main__":

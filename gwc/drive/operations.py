@@ -416,6 +416,295 @@ def get_quota() -> Dict[str, Any]:
 
 
 # ============================================================================
+# Phase 2: Permissions (Access Control)
+# ============================================================================
+
+
+def create_permission(
+    file_id: str,
+    email_or_domain: str,
+    role: str = "reader",
+    permission_type: str = "user",
+    send_notification: bool = True,
+    transfer_ownership: bool = False,
+) -> str:
+    """Create a permission (share a file).
+
+    Args:
+        file_id: File or shared drive ID
+        email_or_domain: User email, group email, or domain (for type=domain)
+        role: Permission role (owner, organizer, fileOrganizer, writer, commenter, reader)
+        permission_type: user, group, domain, or anyone
+        send_notification: Send notification email to recipient
+        transfer_ownership: Transfer ownership (only with role=owner, type=user)
+
+    Returns:
+        Permission ID
+    """
+    service = get_drive_service()
+
+    permission_body = {
+        "role": role,
+        "type": permission_type,
+    }
+
+    if permission_type in ("user", "group"):
+        permission_body["emailAddress"] = email_or_domain
+    elif permission_type == "domain":
+        permission_body["domain"] = email_or_domain
+
+    result = service.permissions().create(
+        fileId=file_id,
+        body=permission_body,
+        sendNotificationEmail=send_notification,
+        transferOwnership=transfer_ownership,
+        fields="id, emailAddress, displayName, role, type, domain"
+    ).execute()
+
+    return result.get("id", "")
+
+
+def get_permission(file_id: str, permission_id: str) -> Dict[str, Any]:
+    """Get a specific permission.
+
+    Args:
+        file_id: File or shared drive ID
+        permission_id: Permission ID
+
+    Returns:
+        Permission dict
+    """
+    service = get_drive_service()
+
+    result = service.permissions().get(
+        fileId=file_id,
+        permissionId=permission_id,
+        fields="id, emailAddress, displayName, role, type, domain, deleted"
+    ).execute()
+
+    return result
+
+
+def list_permissions(file_id: str) -> List[Dict[str, Any]]:
+    """List all permissions on a file or shared drive.
+
+    Args:
+        file_id: File or shared drive ID
+
+    Returns:
+        List of permission dicts
+    """
+    service = get_drive_service()
+
+    results = service.permissions().list(
+        fileId=file_id,
+        fields="permissions(id, emailAddress, displayName, role, type, domain, deleted)",
+        pageSize=100
+    ).execute()
+
+    return results.get("permissions", [])
+
+
+def update_permission(
+    file_id: str,
+    permission_id: str,
+    role: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Update a permission (change role).
+
+    Args:
+        file_id: File or shared drive ID
+        permission_id: Permission ID
+        role: New role (owner, organizer, fileOrganizer, writer, commenter, reader)
+
+    Returns:
+        Updated permission dict
+    """
+    service = get_drive_service()
+
+    body = {}
+    if role:
+        body["role"] = role
+
+    result = service.permissions().update(
+        fileId=file_id,
+        permissionId=permission_id,
+        body=body,
+        fields="id, emailAddress, displayName, role, type, domain"
+    ).execute()
+
+    return result
+
+
+def delete_permission(file_id: str, permission_id: str) -> str:
+    """Delete a permission (revoke access).
+
+    Args:
+        file_id: File or shared drive ID
+        permission_id: Permission ID
+
+    Returns:
+        Permission ID
+    """
+    service = get_drive_service()
+    service.permissions().delete(
+        fileId=file_id,
+        permissionId=permission_id
+    ).execute()
+    return permission_id
+
+
+# ============================================================================
+# Phase 2: Shared Drives
+# ============================================================================
+
+
+def create_drive(
+    name: str,
+    request_id: Optional[str] = None,
+) -> str:
+    """Create a new shared drive.
+
+    Args:
+        name: Shared drive name
+        request_id: Unique request ID (for idempotency)
+
+    Returns:
+        Shared drive ID
+    """
+    service = get_drive_service()
+
+    drive_body = {"name": name}
+
+    result = service.drives().create(
+        body=drive_body,
+        requestId=request_id or f"drive_{name}_{int(__import__('time').time())}",
+        fields="id, name, createdTime"
+    ).execute()
+
+    return result.get("id", "")
+
+
+def get_drive(drive_id: str) -> Dict[str, Any]:
+    """Get shared drive metadata.
+
+    Args:
+        drive_id: Shared drive ID
+
+    Returns:
+        Shared drive dict
+    """
+    service = get_drive_service()
+
+    result = service.drives().get(
+        driveId=drive_id,
+        fields="id, name, createdTime, restrictions, capabilities, hidden"
+    ).execute()
+
+    return result
+
+
+def list_drives(limit: int = 10) -> List[Dict[str, Any]]:
+    """List shared drives.
+
+    Args:
+        limit: Max results (1-100)
+
+    Returns:
+        List of shared drive dicts
+    """
+    service = get_drive_service()
+
+    results = service.drives().list(
+        pageSize=min(limit, 100),
+        fields="drives(id, name, createdTime, hidden, capabilities)",
+        useDomainAdminAccess=False
+    ).execute()
+
+    return results.get("drives", [])
+
+
+def update_drive(
+    drive_id: str,
+    name: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Update shared drive metadata.
+
+    Args:
+        drive_id: Shared drive ID
+        name: New drive name
+
+    Returns:
+        Updated shared drive dict
+    """
+    service = get_drive_service()
+
+    body = {}
+    if name:
+        body["name"] = name
+
+    result = service.drives().update(
+        driveId=drive_id,
+        body=body,
+        fields="id, name, createdTime"
+    ).execute()
+
+    return result
+
+
+def delete_drive(drive_id: str) -> str:
+    """Permanently delete a shared drive.
+
+    Args:
+        drive_id: Shared drive ID (must be organizer)
+
+    Returns:
+        Shared drive ID
+    """
+    service = get_drive_service()
+    service.drives().delete(driveId=drive_id).execute()
+    return drive_id
+
+
+def hide_drive(drive_id: str) -> Dict[str, Any]:
+    """Hide shared drive from default view.
+
+    Args:
+        drive_id: Shared drive ID
+
+    Returns:
+        Updated shared drive dict
+    """
+    service = get_drive_service()
+
+    result = service.drives().hide(
+        driveId=drive_id,
+        fields="id, name, hidden"
+    ).execute()
+
+    return result
+
+
+def unhide_drive(drive_id: str) -> Dict[str, Any]:
+    """Restore shared drive to default view.
+
+    Args:
+        drive_id: Shared drive ID
+
+    Returns:
+        Updated shared drive dict
+    """
+    service = get_drive_service()
+
+    result = service.drives().unhide(
+        driveId=drive_id,
+        fields="id, name, hidden"
+    ).execute()
+
+    return result
+
+
+# ============================================================================
 # Helper Functions
 # ============================================================================
 

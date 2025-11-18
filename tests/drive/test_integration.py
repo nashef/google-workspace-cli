@@ -260,3 +260,164 @@ class TestErrorHandling:
             ["list", "--limit", "not_a_number"],
         )
         assert result.exit_code != 0
+
+
+class TestPhase2Permissions:
+    """Test Phase 2: Permission commands."""
+
+    def test_create_permission_help(self, runner):
+        """Test create-permission command help."""
+        result = runner.invoke(drive_cli.main, ["create-permission", "--help"])
+        assert result.exit_code == 0
+        assert "--email" in result.output
+        assert "--role" in result.output
+
+    def test_get_permission_help(self, runner):
+        """Test get-permission command help."""
+        result = runner.invoke(drive_cli.main, ["get-permission", "--help"])
+        assert result.exit_code == 0
+        assert "FILE_ID" in result.output
+        assert "PERMISSION_ID" in result.output
+
+    def test_list_permissions_help(self, runner):
+        """Test list-permissions command help."""
+        result = runner.invoke(drive_cli.main, ["list-permissions", "--help"])
+        assert result.exit_code == 0
+        assert "FILE_ID" in result.output
+
+    def test_update_permission_help(self, runner):
+        """Test update-permission command help."""
+        result = runner.invoke(drive_cli.main, ["update-permission", "--help"])
+        assert result.exit_code == 0
+        assert "FILE_ID" in result.output
+        assert "PERMISSION_ID" in result.output
+        assert "--role" in result.output
+
+    def test_delete_permission_help(self, runner):
+        """Test delete-permission command help."""
+        result = runner.invoke(drive_cli.main, ["delete-permission", "--help"])
+        assert result.exit_code == 0
+        assert "FILE_ID" in result.output
+        assert "PERMISSION_ID" in result.output
+
+    def test_create_permission_without_email(self, runner):
+        """Test create-permission without --email option."""
+        result = runner.invoke(drive_cli.main, ["create-permission", "file_id"])
+        assert result.exit_code != 0
+
+    def test_get_permission_without_ids(self, runner):
+        """Test get-permission without file_id and permission_id."""
+        result = runner.invoke(drive_cli.main, ["get-permission"])
+        assert result.exit_code != 0
+
+    def test_list_permissions_without_file_id(self, runner):
+        """Test list-permissions without file_id."""
+        result = runner.invoke(drive_cli.main, ["list-permissions"])
+        assert result.exit_code != 0
+
+    def test_update_permission_without_ids(self, runner):
+        """Test update-permission without file_id and permission_id."""
+        result = runner.invoke(drive_cli.main, ["update-permission"])
+        assert result.exit_code != 0
+
+    def test_delete_permission_without_ids(self, runner):
+        """Test delete-permission without file_id and permission_id."""
+        result = runner.invoke(drive_cli.main, ["delete-permission"])
+        assert result.exit_code != 0
+
+    def test_permission_output_formats(self, runner):
+        """Test that permission commands accept all output formats."""
+        for output_fmt in ["unix", "json", "llm"]:
+            result = runner.invoke(
+                drive_cli.main,
+                ["list-permissions", "test_id", "--output", output_fmt],
+                catch_exceptions=False,
+            )
+            assert "--output" not in result.output or result.exit_code in [0, 1]
+
+
+class TestPhase2Drives:
+    """Test Phase 2: Shared drive commands."""
+
+    def test_create_drive_help(self, runner):
+        """Test create-drive command help."""
+        result = runner.invoke(drive_cli.main, ["create-drive", "--help"])
+        assert result.exit_code == 0
+        assert "--name" in result.output
+
+    def test_get_drive_help(self, runner):
+        """Test get-drive command help."""
+        result = runner.invoke(drive_cli.main, ["get-drive", "--help"])
+        assert result.exit_code == 0
+        assert "DRIVE_ID" in result.output
+
+    def test_list_drives_help(self, runner):
+        """Test list-drives command help."""
+        result = runner.invoke(drive_cli.main, ["list-drives", "--help"])
+        assert result.exit_code == 0
+        assert "--limit" in result.output
+
+    def test_update_drive_help(self, runner):
+        """Test update-drive command help."""
+        result = runner.invoke(drive_cli.main, ["update-drive", "--help"])
+        assert result.exit_code == 0
+        assert "DRIVE_ID" in result.output
+        assert "--name" in result.output
+
+    def test_delete_drive_help(self, runner):
+        """Test delete-drive command help."""
+        result = runner.invoke(drive_cli.main, ["delete-drive", "--help"])
+        assert result.exit_code == 0
+        assert "DRIVE_ID" in result.output
+
+    def test_hide_drive_help(self, runner):
+        """Test hide-drive command help."""
+        result = runner.invoke(drive_cli.main, ["hide-drive", "--help"])
+        assert result.exit_code == 0
+        assert "DRIVE_ID" in result.output
+
+    def test_unhide_drive_help(self, runner):
+        """Test unhide-drive command help."""
+        result = runner.invoke(drive_cli.main, ["unhide-drive", "--help"])
+        assert result.exit_code == 0
+        assert "DRIVE_ID" in result.output
+
+    def test_create_drive_without_name(self, runner):
+        """Test create-drive without --name option."""
+        result = runner.invoke(drive_cli.main, ["create-drive"])
+        assert result.exit_code != 0
+
+    def test_get_drive_without_id(self, runner):
+        """Test get-drive without drive_id."""
+        result = runner.invoke(drive_cli.main, ["get-drive"])
+        assert result.exit_code != 0
+
+    def test_update_drive_without_id(self, runner):
+        """Test update-drive without drive_id."""
+        result = runner.invoke(drive_cli.main, ["update-drive"])
+        assert result.exit_code != 0
+
+    def test_delete_drive_without_id(self, runner):
+        """Test delete-drive without drive_id."""
+        result = runner.invoke(drive_cli.main, ["delete-drive"])
+        assert result.exit_code != 0
+
+    def test_hide_drive_without_id(self, runner):
+        """Test hide-drive without drive_id."""
+        result = runner.invoke(drive_cli.main, ["hide-drive"])
+        assert result.exit_code != 0
+
+    def test_unhide_drive_without_id(self, runner):
+        """Test unhide-drive without drive_id."""
+        result = runner.invoke(drive_cli.main, ["unhide-drive"])
+        assert result.exit_code != 0
+
+    def test_drive_output_formats(self, runner):
+        """Test that drive commands accept all output formats."""
+        for output_fmt in ["unix", "json", "llm"]:
+            result = runner.invoke(
+                drive_cli.main,
+                ["list-drives", "--output", output_fmt],
+                catch_exceptions=False,
+            )
+            assert "--output" not in result.output or result.exit_code in [0, 1]

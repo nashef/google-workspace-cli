@@ -60,6 +60,32 @@ poetry run gwc-drive quota --output llm
 | Remove label | `modify-labels file_id --remove label_id` |
 | Add multiple | `modify-labels file_id --add id1 --add id2` |
 
+## Permissions (Phase 2)
+
+| Task | Command |
+|------|---------|
+| Share with user | `create-permission file_id --email user@example.com --role reader` |
+| Share with group | `create-permission file_id --email group@example.com --type group --role editor` |
+| Share with domain | `create-permission file_id --email example.com --type domain --role reader` |
+| Get permission details | `get-permission file_id permission_id --output llm` |
+| List all permissions | `list-permissions file_id --output llm` |
+| Change role | `update-permission file_id permission_id --role editor` |
+| Revoke access | `delete-permission file_id permission_id` |
+| Transfer ownership | `create-permission file_id --email user@example.com --role owner --transfer-ownership` |
+
+## Shared Drives (Phase 2)
+
+| Task | Command |
+|------|---------|
+| Create drive | `create-drive --name "Team Drive"` |
+| Get drive info | `get-drive drive_id --output llm` |
+| List drives | `list-drives --output llm` |
+| List more drives | `list-drives --limit 50 --output json` |
+| Rename drive | `update-drive drive_id --name "New Name"` |
+| Hide drive | `hide-drive drive_id` |
+| Show hidden drive | `unhide-drive drive_id` |
+| Delete drive | `delete-drive drive_id` |
+
 ## User Information
 
 | Task | Command |
