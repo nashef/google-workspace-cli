@@ -106,6 +106,68 @@ def parse_reminders(reminder_strings: Optional[List[str]]) -> Optional[Dict[str,
     return {"useDefault": False, "overrides": overrides}
 
 
+def parse_recurrence(recurrence_string: Optional[str]) -> Optional[List[str]]:
+    """Parse recurrence specification into RRULE strings.
+
+    Args:
+        recurrence_string: Recurrence pattern, one of:
+            - "daily": Repeats daily
+            - "weekly:MO,WE,FR": Repeats weekly on specified days
+            - "monthly": Repeats monthly on same day
+            - "yearly": Repeats yearly on same date
+            - "RRULE:...": Raw iCalendar RRULE string
+            - Multiple patterns separated by semicolons
+
+    Returns:
+        List of RRULE strings for the recurrence field, or None if no recurrence
+
+    Raises:
+        ValidationError: If format is invalid
+    """
+    if not recurrence_string:
+        return None
+
+    rrules = []
+    patterns = recurrence_string.split(";")
+
+    for pattern in patterns:
+        pattern = pattern.strip()
+        if not pattern:
+            continue
+
+        # If it starts with RRULE:, it's already in RRULE format
+        if pattern.startswith("RRULE:"):
+            rrules.append(pattern)
+            continue
+
+        # Parse friendly formats
+        if pattern == "daily":
+            rrules.append("RRULE:FREQ=DAILY")
+        elif pattern.startswith("weekly:"):
+            days = pattern[7:].upper()
+            # Validate day format (MO,WE,FR, etc.)
+            valid_days = {"MO", "TU", "WE", "TH", "FR", "SA", "SU"}
+            day_list = [d.strip() for d in days.split(",")]
+            for day in day_list:
+                if day not in valid_days:
+                    raise ValidationError(
+                        f"Invalid day in weekly pattern: '{day}'. "
+                        f"Valid days: MO, TU, WE, TH, FR, SA, SU"
+                    )
+            rrules.append(f"RRULE:FREQ=WEEKLY;BYDAY={days}")
+        elif pattern == "monthly":
+            rrules.append("RRULE:FREQ=MONTHLY")
+        elif pattern == "yearly":
+            rrules.append("RRULE:FREQ=YEARLY")
+        else:
+            raise ValidationError(
+                f"Invalid recurrence pattern: '{pattern}'\n"
+                f"Use: daily, weekly:MO,WE,FR, monthly, yearly, or RRULE:..."
+            )
+
+    return rrules if rrules else None
+
+
 def validate_iso8601(timestamp: str) -> datetime:
     """Validate and parse ISO8601 timestamp.
 
@@ -154,6 +216,7 @@ def create_event(
     transparency: Optional[str] = None,
     visibility: Optional[str] = None,
     reminders: Optional[List[str]] = None,
+    recurrence: Optional[str] = None,
     send_updates: Optional[str] = None,
     calendar_id: str = "primary"
 ) -> Dict[str, Any]:
@@ -170,6 +233,7 @@ def create_event(
         transparency: "opaque" (busy) or "transparent" (free)
         visibility: "default", "public", "private", or "confidential"
         reminders: List of "method:minutes" strings (e.g., ["popup:10", "email:1440"]) or ["default"]
+        recurrence: Recurrence pattern: "daily", "weekly:MO,WE,FR", "monthly", "yearly", or "RRULE:..."
         send_updates: "all", "externalOnly", or "none" - notify guests
         calendar_id: Calendar ID (default "primary")
 
@@ -246,6 +310,12 @@ def create_event(
         reminders_obj = parse_reminders(reminders)
         if reminders_obj:
             event['reminders'] = reminders_obj
+
+    # Parse and add recurrence
+    if recurrence:
+        rrules = parse_recurrence(recurrence)
+        if rrules:
+            event['recurrence'] = rrules
 
     # Create event
     service = build_calendar_service()
@@ -399,6 +469,7 @@ def update_event(
     transparency: Optional[str] = None,
     visibility: Optional[str] = None,
     reminders: Optional[List[str]] = None,
+    recurrence: Optional[str] = None,
     send_updates: Optional[str] = None,
     calendar_id: str = "primary"
 ) -> Dict[str, Any]:
@@ -416,6 +487,7 @@ def update_event(
         transparency: "opaque" (busy) or "transparent" (free)
         visibility: "default", "public", "private", or "confidential"
         reminders: List of "method:minutes" strings or ["default"]
+        recurrence: Recurrence pattern: "daily", "weekly:MO,WE,FR", "monthly", "yearly", or "RRULE:..."
         send_updates: "all", "externalOnly", or "none" - notify guests
         calendar_id: Calendar ID (default "primary")
 
@@ -487,6 +559,12 @@ def update_event(
         reminders_obj = parse_reminders(reminders)
         if reminders_obj:
             event['reminders'] = reminders_obj
+
+    # Parse and add recurrence
+    if recurrence:
+        rrules = parse_recurrence(recurrence)
+        if rrules:
+            event['recurrence'] = rrules
 
     # Perform update
     try:

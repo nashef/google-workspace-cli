@@ -218,6 +218,10 @@ def list(output):
     help='Set reminders (comma-separated): "method:minutes" (e.g., "popup:10,email:1440") or "default"'
 )
 @click.option(
+    '--recurrence',
+    help='Recurrence pattern: "daily", "weekly:MO,WE,FR", "monthly", "yearly", or "RRULE:..."'
+)
+@click.option(
     '--calendar',
     default='primary',
     help='Calendar ID (default: primary)'
@@ -228,7 +232,7 @@ def list(output):
     default='unix',
     help='Output format (default: unix)'
 )
-def create(time, subject, duration, attendees, description, meet, location, transparency, visibility, description_file, notify, reminder, calendar, output):
+def create(time, subject, duration, attendees, description, meet, location, transparency, visibility, description_file, notify, reminder, recurrence, calendar, output):
     """Create a new calendar event.
 
     Examples:
@@ -263,6 +267,7 @@ def create(time, subject, duration, attendees, description, meet, location, tran
             transparency=transparency,
             visibility=visibility,
             reminders=reminder_list,
+            recurrence=recurrence,
             send_updates=notify,
             calendar_id=calendar
         )
@@ -379,6 +384,10 @@ def get(event_id, calendar, output):
     help='Set reminders (comma-separated): "method:minutes" (e.g., "popup:10,email:1440") or "default"'
 )
 @click.option(
+    '--recurrence',
+    help='Recurrence pattern: "daily", "weekly:MO,WE,FR", "monthly", "yearly", or "RRULE:..."'
+)
+@click.option(
     '--calendar',
     default='primary',
     help='Calendar ID (default: primary)'
@@ -389,7 +398,7 @@ def get(event_id, calendar, output):
     default='unix',
     help='Output format (default: unix)'
 )
-def update(event_id, time, subject, duration, attendees, description, meet, location, transparency, visibility, description_file, notify, add_attendee, remove_attendee, reminder, calendar, output):
+def update(event_id, time, subject, duration, attendees, description, meet, location, transparency, visibility, description_file, notify, add_attendee, remove_attendee, reminder, recurrence, calendar, output):
     """Update a calendar event.
 
     Only specified fields are updated.
@@ -449,6 +458,7 @@ def update(event_id, time, subject, duration, attendees, description, meet, loca
             transparency=transparency,
             visibility=visibility,
             reminders=reminder_list,
+            recurrence=recurrence,
             send_updates=notify,
             calendar_id=calendar
         )
