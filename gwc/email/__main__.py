@@ -145,17 +145,24 @@ def list(label: str, limit: int, query: str, output: str, page_token: Optional[s
             click.echo("No messages found.")
             return
 
-        # Format for output
+        # Format for output - fetch full message details for each
         data = []
         for msg in messages:
-            data.append(
-                {
-                    "id": msg["id"],
-                    "threadId": msg.get("threadId", ""),
-                    "snippet": msg.get("snippet", "")[:80],
-                    "date": msg.get("internalDate", ""),
-                }
-            )
+            try:
+                # Fetch full message to get headers
+                full_msg = get_message(msg["id"])
+                formatted = format_message_for_display(full_msg)
+                data.append(formatted)
+            except Exception:
+                # Fallback to basic info if fetch fails
+                data.append(
+                    {
+                        "id": msg["id"],
+                        "threadId": msg.get("threadId", ""),
+                        "snippet": msg.get("snippet", "")[:80],
+                        "date": msg.get("internalDate", ""),
+                    }
+                )
 
         click.echo(format_output(data, OutputFormat(output)))
 
@@ -218,17 +225,24 @@ def search(query: str, limit: int, output: str):
             click.echo("No messages found.")
             return
 
-        # Format for output
+        # Format for output - fetch full message details for each
         data = []
         for msg in messages:
-            data.append(
-                {
-                    "id": msg["id"],
-                    "threadId": msg.get("threadId", ""),
-                    "snippet": msg.get("snippet", "")[:80],
-                    "date": msg.get("internalDate", ""),
-                }
-            )
+            try:
+                # Fetch full message to get headers
+                full_msg = get_message(msg["id"])
+                formatted = format_message_for_display(full_msg)
+                data.append(formatted)
+            except Exception:
+                # Fallback to basic info if fetch fails
+                data.append(
+                    {
+                        "id": msg["id"],
+                        "threadId": msg.get("threadId", ""),
+                        "snippet": msg.get("snippet", "")[:80],
+                        "date": msg.get("internalDate", ""),
+                    }
+                )
 
         click.echo(format_output(data, OutputFormat(output)))
 

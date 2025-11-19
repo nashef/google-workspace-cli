@@ -2,8 +2,9 @@
 
 ## 1. Email search and get commands return incomplete metadata
 
-**Status**: Open
+**Status**: FIXED ✅
 **Date**: 2025-11-18
+**Fixed**: 2025-11-18
 
 ### Problem
 The `gwc-mail search` and `gwc-mail get` commands are not returning complete email metadata.
@@ -41,10 +42,16 @@ body: [No body content]...
 - Search should return: from, subject, date, snippet for each email
 - Get should return full email headers and body content
 
-### Possible Fix
-The operations.py file likely needs to:
-1. Request additional metadata fields in the search query
-2. Parse the payload correctly to extract headers and body
+### Resolution
+**Fixed by fetching full message details for each result.**
+
+The issue was that `list` and `search` commands were only displaying the minimal metadata returned by the Gmail API's list endpoint. The fix fetches complete message details for each result using `get_message()` and `format_message_for_display()` to extract all headers and body content.
+
+**Changes made:**
+- Modified `gwc/email/__main__.py` lines 149-159 and 221-231
+- Both `list` and `search` commands now fetch full message details
+- Includes fallback to basic info if individual message fetch fails
+- All metadata now displays correctly: from, to, subject, date, body, etc.
 
 ### Environment
 - Poetry environment
